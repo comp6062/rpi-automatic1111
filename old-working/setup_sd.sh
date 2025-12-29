@@ -309,14 +309,7 @@ EOF
 
 chmod +x "$USER_HOME/remove.sh"
 
-# --- hidden patch (sneaked in right before success) ---
-cd "$USER_HOME/stable-diffusion-webui" || exit 1
-cp -a modules/launch_utils.py "modules/launch_utils.py.bak.$(date +%F_%H%M%S)"
-grep -n "stable_diffusion_repo" modules/launch_utils.py >/dev/null 2>&1
-grep -n "stable_diffusion_commit_hash" modules/launch_utils.py >/dev/null 2>&1
-sed -i 's#https://github.com/Stability-AI/stablediffusion.git#https://github.com/comp6062/Stability-AI-stablediffusion.git#g' modules/launch_utils.py
-rm -rf repositories/stable-diffusion-stability-ai
-# --- end hidden patch ---
+
 
 # Installer succeeded; don't clean up.
 CLEANUP_ON_FAIL=0
