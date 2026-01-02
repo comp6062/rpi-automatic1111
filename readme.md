@@ -7,13 +7,10 @@
 ![License](https://img.shields.io/badge/license-MIT-informational)
 
 This repository provides a **fully automated setup** for running  
-**AUTOMATIC1111 Stable Diffusion WebUI** on Raspberry Pi and other ARM-based Linux systems.
+**AUTOMATIC1111 Stable Diffusion WebUI** (AI image generator), on Raspberry Pi and other ARM-based Linux systems.
 
 It supports **CPU-only inference**, is optimized for ARM environments, and includes
 a guided installer, unified launcher, and clean uninstall process.
-
-Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions,
-including **Bullseye**, **Bookworm**, and **Trixie**.
 
 ---
 
@@ -109,23 +106,13 @@ best possible installation path for your system **without user input**.
 uname -m
 ```
 
+Based on the result:
+
 | Detected value | Installation path |
 |---------------|-------------------|
 | `aarch64` | ARM64 (official PyTorch CPU wheels) |
 | `armv7l`, `armv7*` | ARM32 (prebuilt community wheels) |
 | Other | Installation stops (unsupported) |
-
-### Installation Behavior
-
-- **ARM64 systems**
-  - Use the official PyTorch CPU wheel index
-  - Fully supported and recommended
-- **ARM32 systems**
-  - Attempt installation using matching prebuilt wheels
-  - If compatible wheels are not available, the installer **fails cleanly**
-  - No source builds or partial installs are attempted
-
-This ensures the system is **never left in a broken or undefined state**.
 
 ---
 
@@ -138,6 +125,12 @@ This ensures the system is **never left in a broken or undefined state**.
 
 ### Strongly Recommended
 - **64-bit Raspberry Pi OS**
+
+### Supported OS Releases
+- Raspberry Pi OS / Debian-based systems:
+  - **Bullseye**
+  - **Bookworm**
+  - **Trixie**
 
 ### Required Packages
 - `python3`
@@ -173,24 +166,67 @@ wget -qO- https://raw.githubusercontent.com/comp6062/rpi-automatic1111/main/setu
 
 ---
 
-## Model Download Control (Setup Script)
+# Model Download Control (Setup Script)
 
-By default, the setup script **automatically downloads a small set of example Stable Diffusion models**
-during installation.
+## Default Model Download Behavior
+
+By default, the setup script **automatically downloads a small set of example Stable Diffusion models** during installation.  
+This allows the WebUI to be used immediately after setup completes.
+
+---
+
+## Enable Model Downloads (Default)
+
+```bash
+MODEL1_PATH="$WEBUI_DIR/models/Stable-diffusion/CyberRealistic_V7.0_FP16.safetensors"
+MODEL1_URL="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V7.0_FP16.safetensors"
+MODEL2_PATH="$WEBUI_DIR/models/Stable-diffusion/Realistic_Vision_V5.1-inpainting.safetensors"
+MODEL2_URL="https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1-inpainting.safetensors"
+```
+
+---
+
+## Disable Model Downloads During Setup
+
+If you prefer to **skip downloading models during installation**, comment out the model lines in `setup_sd.sh`.
+
+---
+
+## Adding Models Manually (Optional)
+
+If model downloads are disabled, place your `.ckpt` or `.safetensors` files in:
+
+```bash
+~/stable-diffusion-webui/models/Stable-diffusion/
+```
+
+Restart the WebUI after adding new models.
 
 ---
 
 ## Running Stable Diffusion
 
+Launch the unified launcher:
+
 ```bash
 ~/run_sd.sh
 ```
+
+Then:
+
+1. Select **LAN** or **Offline** mode
+2. Open the printed URL in your browser
+3. Start generating images
 
 ---
 
 ## Offline Mode
 
-Accessible at:
+Offline mode runs Stable Diffusion **without internet access**:
+
+- Uses already downloaded models
+- Skips package installation and updates
+- Accessible at:
 
 ```
 http://127.0.0.1:7860
@@ -199,6 +235,8 @@ http://127.0.0.1:7860
 ---
 
 ## Uninstalling
+
+To completely remove everything:
 
 ```bash
 ~/remove.sh
@@ -231,5 +269,5 @@ http://127.0.0.1:7860
 | ARM64 (aarch64) | Fully supported (recommended) |
 | ARM32 (armv7l) | Best effort only |
 
-If installation fails on ARM32, switch to a **64-bit OS**.
+If installation fails on ARM32, switch to a **64-bit OS**.  
 That is the intended and supported upgrade path.
