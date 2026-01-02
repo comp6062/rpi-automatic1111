@@ -7,12 +7,12 @@
 ![License](https://img.shields.io/badge/license-MIT-informational)
 
 This repository provides a **fully automated setup** for running  
-**AUTOMATIC1111 Stable Diffusion WebUI** (AI image generator), on Raspberry Pi and other ARM-based Linux systems.
+**AUTOMATIC1111 Stable Diffusion WebUI** on Raspberry Pi and other ARM-based Linux systems.
 
 It supports **CPU-only inference**, is optimized for ARM environments, and includes
 a guided installer, unified launcher, and clean uninstall process.
 
-Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions,  
+Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions,
 including **Bullseye**, **Bookworm**, and **Trixie**.
 
 ---
@@ -105,7 +105,131 @@ best possible installation path for your system **without user input**.
 
 ### Detection Process
 
-At runtime, the installer checks:
-
 ```bash
 uname -m
+```
+
+| Detected value | Installation path |
+|---------------|-------------------|
+| `aarch64` | ARM64 (official PyTorch CPU wheels) |
+| `armv7l`, `armv7*` | ARM32 (prebuilt community wheels) |
+| Other | Installation stops (unsupported) |
+
+### Installation Behavior
+
+- **ARM64 systems**
+  - Use the official PyTorch CPU wheel index
+  - Fully supported and recommended
+- **ARM32 systems**
+  - Attempt installation using matching prebuilt wheels
+  - If compatible wheels are not available, the installer **fails cleanly**
+  - No source builds or partial installs are attempted
+
+This ensures the system is **never left in a broken or undefined state**.
+
+---
+
+## System Requirements
+
+### Minimum
+- Raspberry Pi 4 / 5 or other ARM SBC
+- 4 GB RAM (8 GB recommended)
+- Internet connection (for install)
+
+### Strongly Recommended
+- **64-bit Raspberry Pi OS**
+
+### Required Packages
+- `python3`
+- `python3-venv`
+- `git`
+- `curl`
+- `wget`
+
+---
+
+## Installation
+
+Install everything with **one command**:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/comp6062/rpi-automatic1111/main/setup_sd.sh | bash
+```
+
+Or using `wget`:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/comp6062/rpi-automatic1111/main/setup_sd.sh | bash
+```
+
+### The installer will
+
+- Install system dependencies
+- Create a Python virtual environment
+- Clone AUTOMATIC1111 Stable Diffusion WebUI
+- Install Python requirements
+- Download default models
+- Create `~/run_sd.sh` and `~/remove.sh`
+
+---
+
+## Model Download Control (Setup Script)
+
+By default, the setup script **automatically downloads a small set of example Stable Diffusion models**
+during installation.
+
+---
+
+## Running Stable Diffusion
+
+```bash
+~/run_sd.sh
+```
+
+---
+
+## Offline Mode
+
+Accessible at:
+
+```
+http://127.0.0.1:7860
+```
+
+---
+
+## Uninstalling
+
+```bash
+~/remove.sh
+```
+
+---
+
+## Known Limitations
+
+- CPU-only inference (no GPU acceleration)
+- ARM32 is slower and less stable
+- Large models may exceed available RAM
+- First generation can take several minutes on Raspberry Pi hardware
+
+---
+
+## Credits
+
+- AUTOMATIC1111 – Stable Diffusion WebUI
+- PyTorch Team – CPU wheel support
+- PINTO0309 – Raspberry Pi ARM32 PyTorch wheels
+- Raspberry Pi community
+
+---
+
+## Recommendation Summary
+
+| Architecture | Status |
+|-------------|--------|
+| ARM64 (aarch64) | Fully supported (recommended) |
+| ARM32 (armv7l) | Best effort only |
+
+If installation fails on ARM32, switch to a **64-bit OS**.
+That is the intended and supported upgrade path.
