@@ -1,0 +1,111 @@
+# Stable Diffusion WebUI – Raspberry Pi (ARM)
+
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20%2F%20ARM-blue)
+![CPU](https://img.shields.io/badge/acceleration-CPU--only-orange)
+![ARM64](https://img.shields.io/badge/ARM64-aarch64-success)
+![ARM32](https://img.shields.io/badge/ARM32-armv7l-yellow)
+![License](https://img.shields.io/badge/license-MIT-informational)
+
+This repository provides a **fully automated setup** for running  
+**AUTOMATIC1111 Stable Diffusion WebUI** (AI image generator), on Raspberry Pi and other ARM-based Linux systems.
+
+It supports **CPU-only inference**, is optimized for ARM environments, and includes
+a guided installer, unified launcher, and clean uninstall process.
+
+Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions, including Bullseye, Bookworm, and Trixie.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Supported Architectures](#supported-architectures)
+  - [ARM64 aarch64 recommended](#arm64-aarch64-recommended)
+  - [ARM32 armv7l best-effort](#arm32-armv7l-best-effort)
+- [Architecture Detection & Install Logic](#architecture-detection--install-logic)
+- [System Requirements](#system-requirements)
+- [Installation](#installation)
+- [Model Download Control (Setup Script)](#model-download-control-setup-script)
+- [Running Stable Diffusion](#running-stable-diffusion)
+- [Offline Mode](#offline-mode)
+- [Uninstalling](#uninstalling)
+- [Known Limitations](#known-limitations)
+- [Credits](#credits)
+- [Recommendation Summary](#recommendation-summary)
+
+---
+
+## Overview
+
+This setup installs and configures:
+
+- AUTOMATIC1111 Stable Diffusion WebUI
+- Python virtual environment
+- CPU-only PyTorch (no CUDA / no ROCm)
+- Unified launcher (`~/run_sd.sh`)
+- Clean uninstall script (`~/remove.sh`)
+
+Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions.
+
+---
+
+## Supported Architectures
+
+The installer **automatically detects your CPU architecture** and installs the
+appropriate PyTorch build.
+
+---
+
+### ARM64 aarch64 recommended
+
+This is the **preferred and most reliable configuration**.
+
+**Details:**
+- Uses **official CPU-only PyTorch wheels**
+- Installed from the official PyTorch CPU index
+- Fully compatible with modern Python versions
+- Uses Python 3.10 inside a virtual environment (installed in user space)
+
+**Why ARM64 is recommended:**
+- Faster installation
+- Fewer dependency issues
+- Better performance
+- Works best on Raspberry Pi 4 / 5 (64-bit OS)
+
+---
+
+### ARM32 armv7l best-effort
+
+ARM32 (32-bit Raspberry Pi OS) support is provided on a **best-effort basis**.
+
+**How it works:**
+- Installs **prebuilt ARM32 wheels** for:
+  - `torch`
+  - `torchvision`
+  - `numpy` (when available)
+- Wheels are sourced from:
+  **PINTO0309 / pytorch4raspberrypi**
+- Python version is matched dynamically (e.g. `cp39`, `cp310`)
+
+**Limitations:**
+- Not all Python versions have matching wheels
+- Significantly slower than ARM64
+- Higher memory pressure
+
+**If matching wheels are unavailable:**
+- Installation stops with a clear error
+- You are instructed to switch to a **64-bit OS**
+
+---
+
+## Architecture Detection & Install Logic
+
+This setup script performs **automatic architecture detection** and selects the
+best possible installation path for your system **without user input**.
+
+### Detection Process
+
+At runtime, the installer checks:
+
+```bash
+uname -m
