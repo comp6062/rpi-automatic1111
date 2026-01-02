@@ -13,7 +13,7 @@ It supports **CPU-only inference**, is optimized for ARM environments, and inclu
 a guided installer, unified launcher, and clean uninstall process.
 
 Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions,
-including Bullseye, Bookworm, and Trixie.
+including **Bullseye**, **Bookworm**, and **Trixie**.
 
 ---
 
@@ -65,7 +65,7 @@ This is the **preferred and most reliable configuration**.
 - Uses **official CPU-only PyTorch wheels**
 - Installed from the official PyTorch CPU index
 - Fully compatible with modern Python versions
-- Uses Python 3.10 inside a virtual environment (installed in user space)
+- Uses **Python 3.10 inside a virtual environment** (installed in user space for consistency across Bullseye/Bookworm/Trixie)
 
 **Why ARM64 is recommended:**
 - Faster installation
