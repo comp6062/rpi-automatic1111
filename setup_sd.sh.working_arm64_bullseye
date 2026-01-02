@@ -1,325 +1,118 @@
-#!/bin/bash
+# Stable Diffusion WebUI – Raspberry Pi (ARM)
 
-# Define color variables for pretty output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No color
+![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi%20%2F%20ARM-blue)
+![CPU](https://img.shields.io/badge/acceleration-CPU--only-orange)
+![ARM64](https://img.shields.io/badge/ARM64-aarch64-success)
+![ARM32](https://img.shields.io/badge/ARM32-armv7l-yellow)
+![License](https://img.shields.io/badge/license-MIT-informational)
 
-# Function to show progress with red color
-progress_bar() {
-    echo -e "${RED}$1${NC}"
-    sleep 1
-}
+This repository provides a **fully automated setup** for running  
+**AUTOMATIC1111 Stable Diffusion WebUI** (AI image generator), on Raspberry Pi and other ARM-based Linux systems.
 
-# Dynamically determine the user's home directory
-USER_HOME=$(eval echo ~$USER)
-WEBUI_DIR="$USER_HOME/stable-diffusion-webui"
-VENV_DIR="$USER_HOME/stable-diffusion-env"
+It supports **CPU-only inference**, is optimized for ARM environments, and includes
+a guided installer, unified launcher, and clean uninstall process.
 
-# -----------------------------
-# Clean fail (README promise)
-# -----------------------------
-CLEANUP_ON_FAIL=1
-cleanup_partial_install() {
-    [ "$CLEANUP_ON_FAIL" = "1" ] || return 0
-    echo -e "${YELLOW}Installer failed. Cleaning up partial install...${NC}"
-    rm -rf "$WEBUI_DIR" 2>/dev/null || true
-    rm -rf "$VENV_DIR" 2>/dev/null || true
-}
-trap cleanup_partial_install ERR
+Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions,
+including **Bullseye**, **Bookworm**, and **Trixie**.
 
-# -----------------------------
-# Architecture detection (README)
-# -----------------------------
-ARCH="$(uname -m)"
-is_arm64() { [ "$ARCH" = "aarch64" ]; }
-is_arm32() { [[ "$ARCH" == armv7* ]] || [ "$ARCH" = "armv7l" ]; }
+---
 
-# Update and upgrade system
-progress_bar "Updating and upgrading system..."
-sudo apt update && sudo apt upgrade -y
+## Table of Contents
 
-# Install necessary dependencies (README includes curl)
-progress_bar "Installing necessary dependencies..."
-sudo apt install -y python3 python3-pip python3-venv git libgl1 libglib2.0-0 wget curl
+- [Overview](#overview)
+- [Supported Architectures](#supported-architectures)
+  - [ARM64 aarch64 recommended](#arm64-aarch64-recommended)
+  - [ARM32 armv7l best-effort](#arm32-armv7l-best-effort)
+- [Architecture Detection & Install Logic](#architecture-detection--install-logic)
+- [System Requirements](#system-requirements)
+- [Installation](#installation)
+- [Model Download Control (Setup Script)](#model-download-control-setup-script)
+- [Running Stable Diffusion](#running-stable-diffusion)
+- [Offline Mode](#offline-mode)
+- [Uninstalling](#uninstalling)
+- [Known Limitations](#known-limitations)
+- [Credits](#credits)
+- [Recommendation Summary](#recommendation-summary)
 
-# Gate unsupported architectures
-if is_arm64; then
-    echo -e "${GREEN}Detected architecture: aarch64 (ARM64).${NC}"
-elif is_arm32; then
-    echo -e "${YELLOW}Detected architecture: armv7l (ARM32) — best effort.${NC}"
-else
-    echo -e "${RED}Unsupported architecture: ${ARCH}${NC}"
-    echo -e "${YELLOW}Supported: aarch64 (recommended) and armv7l/armv7* (best effort).${NC}"
-    exit 1
-fi
+---
 
-# Helper: download if missing (models)
-download_if_missing() {
-    # $1=url, $2=path
-    local url="$1"
-    local path="$2"
+## Overview
 
-    # README: user disables downloads by commenting out MODEL lines
-    if [ -z "$url" ] || [ -z "$path" ]; then
-        echo -e "${YELLOW}Model download disabled (MODEL lines commented out). Skipping.${NC}"
-        return 0
-    fi
+This setup installs and configures:
 
-    if [ -f "$path" ]; then
-        echo -e "${GREEN}Model already exists:${NC} $path"
-        return 0
-    fi
+- AUTOMATIC1111 Stable Diffusion WebUI
+- Python virtual environment
+- CPU-only PyTorch (no CUDA / no ROCm)
+- Unified launcher (`~/run_sd.sh`)
+- Clean uninstall script (`~/remove.sh`)
 
-    mkdir -p "$(dirname "$path")"
-    echo -e "${RED}Downloading:${NC} $url"
-    wget -O "$path" "$url"
-}
+Designed for **Raspberry Pi OS**, **Debian**, and other ARM Linux distributions.
 
-# -----------------------------
-# ARM32: install community wheels from PINTO0309/pytorch4raspberrypi
-# - Match python ABI dynamically (cp39, cp310, etc.)
-# - Install torch + torchvision (required), numpy (optional if available)
-# - Fail cleanly if missing required wheels (README)
-# -----------------------------
-install_pytorch_arm32_best_effort() {
-    progress_bar "ARM32: locating matching prebuilt wheels (PINTO0309/pytorch4raspberrypi)..."
+### Additional behavior
 
-    local py_abi
-    py_abi="$(python3 -c 'import sys; print(f"cp{sys.version_info.major}{sys.version_info.minor}")')"
+- Uses a consistent **Python 3.10 virtual environment** to avoid OS Python differences
+- Applies a small patch to replace a **broken Stability-AI repo URL**
+- Fails cleanly and removes partial installs if anything goes wrong
 
-    local api="https://api.github.com/repos/PINTO0309/pytorch4raspberrypi/releases"
-    local torch_url torchvision_url numpy_url
+---
 
-    torch_url="$(curl -fsSL "$api" | python3 - <<PY
-import json, sys
-abi = sys.argv[1]
-data = json.load(sys.stdin)
-def ok(name):
-    n=name.lower()
-    return ('torch-' in n and 'torchvision' not in n and abi in n and 'armv7l' in n and n.endswith('.whl'))
-for rel in data:
-    for a in rel.get('assets', []):
-        name=a.get('name','')
-        if ok(name):
-            print(a.get('browser_download_url',''))
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
-"$py_abi")" || true
+## Supported Architectures
 
-    torchvision_url="$(curl -fsSL "$api" | python3 - <<PY
-import json, sys
-abi = sys.argv[1]
-data = json.load(sys.stdin)
-def ok(name):
-    n=name.lower()
-    return ('torchvision' in n and abi in n and 'armv7l' in n and n.endswith('.whl'))
-for rel in data:
-    for a in rel.get('assets', []):
-        name=a.get('name','')
-        if ok(name):
-            print(a.get('browser_download_url',''))
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
-"$py_abi")" || true
+The installer **automatically detects your CPU architecture** and installs the
+appropriate PyTorch build.
 
-    numpy_url="$(curl -fsSL "$api" | python3 - <<PY
-import json, sys
-abi = sys.argv[1]
-data = json.load(sys.stdin)
-def ok(name):
-    n=name.lower()
-    return ('numpy' in n and abi in n and 'armv7l' in n and n.endswith('.whl'))
-for rel in data:
-    for a in rel.get('assets', []):
-        name=a.get('name','')
-        if ok(name):
-            print(a.get('browser_download_url',''))
-            raise SystemExit(0)
-raise SystemExit(1)
-PY
-"$py_abi")" || true
+---
 
-    if [ -z "$torch_url" ] || [ -z "$torchvision_url" ]; then
-        echo -e "${RED}ARM32 install failed cleanly:${NC} No compatible torch/torchvision wheels found for ${py_abi} (armv7l)."
-        echo -e "${YELLOW}Recommendation:${NC} Switch to a 64-bit OS (ARM64), as noted in the README."
-        return 1
-    fi
+### ARM64 aarch64 recommended
 
-    # Some wheels need runtime deps; best-effort, don't hard-fail
-    sudo apt install -y libopenblas0 libgomp1 libblas3 >/dev/null 2>&1 || true
+This is the **preferred and most reliable configuration**.
 
-    if [ -n "$numpy_url" ]; then
-        progress_bar "ARM32: installing numpy wheel (when available)..."
-        pip install "$numpy_url"
-    fi
+**Details:**
+- Uses **official CPU-only PyTorch wheels**
+- Installed from the official PyTorch CPU index
+- Fully compatible with modern Python versions
+- Uses Python 3.10 inside a virtual environment (installed in user space)
 
-    progress_bar "ARM32: installing torch + torchvision wheels..."
-    pip install "$torch_url" "$torchvision_url"
+**Why ARM64 is recommended:**
+- Faster installation
+- Fewer dependency issues
+- Better performance
+- Works best on Raspberry Pi 4 / 5 (64-bit OS)
 
-    return 0
-}
+---
 
-# Create and activate a virtual environment inside the user's home directory
-progress_bar "Setting up virtual environment..."
-python3 -m venv "$VENV_DIR"
-# shellcheck disable=SC1090
-source "$VENV_DIR/bin/activate"
+### ARM32 armv7l best-effort
 
-# Clone the Stable Diffusion WebUI repository
-progress_bar "Cloning Stable Diffusion WebUI repository..."
-rm -rf "$WEBUI_DIR" 2>/dev/null || true
-git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui.git "$WEBUI_DIR"
-cd "$WEBUI_DIR"
+ARM32 (32-bit Raspberry Pi OS) support is provided on a **best-effort basis**.
 
-# Install PyTorch and requirements
-progress_bar "Installing PyTorch and other dependencies..."
-if is_arm64; then
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-else
-    install_pytorch_arm32_best_effort
-fi
+**How it works:**
+- Installs **prebuilt ARM32 wheels** for:
+  - `torch`
+  - `torchvision`
+  - `numpy` (when available)
+- Wheels are sourced from:
+  **PINTO0309 / pytorch4raspberrypi**
+- Python version is matched dynamically (e.g. `cp39`, `cp310`)
 
-pip install -r requirements.txt
+**Limitations:**
+- Not all Python versions have matching wheels
+- Significantly slower than ARM64
+- Higher memory pressure
 
-# Download the model files (README: comment out MODEL lines to disable)
-progress_bar "Downloading the model files..."
+**If matching wheels are unavailable:**
+- Installation stops with a clear error
+- You are instructed to switch to a **64-bit OS**
 
-# Enabled (Download Models During Setup)
-MODEL1_PATH="$WEBUI_DIR/models/Stable-diffusion/CyberRealistic_V7.0_FP16.safetensors"
-MODEL1_URL="https://huggingface.co/cyberdelia/CyberRealistic/resolve/main/CyberRealistic_V7.0_FP16.safetensors"
-MODEL2_PATH="$WEBUI_DIR/models/Stable-diffusion/Realistic_Vision_V5.1-inpainting.safetensors"
-MODEL2_URL="https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1-inpainting.safetensors"
+---
 
-# To DISABLE model downloads, comment out the MODEL*_PATH and MODEL*_URL lines above (as shown in readme.md)
+## Architecture Detection & Install Logic
 
-download_if_missing "$MODEL1_URL" "$MODEL1_PATH"
-download_if_missing "$MODEL2_URL" "$MODEL2_PATH"
+This setup script performs **automatic architecture detection** and selects the
+best possible installation path for your system **without user input**.
 
-# Create the unified run_sd.sh script
-progress_bar "Creating run_sd.sh script..."
-cat <<'EOF' > "$USER_HOME/run_sd.sh"
-#!/bin/bash
+### Detection Process
 
-RED='[0;31m'
-GREEN='[0;32m'
-YELLOW='[1;33m'
-NC='[0m'
+At runtime, the installer checks:
 
-USER_HOME=$(eval echo ~$USER)
-WEBUI_DIR="$USER_HOME/stable-diffusion-webui"
-VENV_DIR="$USER_HOME/stable-diffusion-env"
-
-cleanup() {
-    echo -e "${YELLOW}Stopping Stable Diffusion...${NC}"
-    pkill -f "launch.py" 2>/dev/null
-    deactivate 2>/dev/null
-    echo -e "${YELLOW}Virtual environment deactivated.${NC}"
-    exit
-}
-
-trap cleanup SIGINT
-
-if [ ! -d "$VENV_DIR" ]; then
-    echo -e "${RED}Virtual environment not found at $VENV_DIR. Please set it up first.${NC}"
-    exit 1
-fi
-
-if [ ! -d "$WEBUI_DIR" ]; then
-    echo -e "${RED}Stable Diffusion WebUI not found at $WEBUI_DIR.${NC}"
-    exit 1
-fi
-
-echo ""
-echo -e "${GREEN}Select an option:${NC}"
-echo "1) Run connected to the internet (http://LAN_IP:7860)"
-echo "2) Run completely offline / localhost only (http://127.0.0.1:7860)"
-echo "3) Uninstall"
-echo "q) Quit"
-echo ""
-read -rp "Enter your choice: " choice
-
-case "$choice" in
-    1)
-        echo -e "${GREEN}Running with internet connection (LAN access)...${NC}"
-        source "$VENV_DIR/bin/activate"
-        cd "$WEBUI_DIR" || exit 1
-        DEFAULT_LOCAL_IP=$(hostname -I | awk '{print $1}')
-        echo -e "Access it at: http://$DEFAULT_LOCAL_IP:7860"
-        python launch.py --skip-torch-cuda-test --no-half --listen
-        cleanup
-        ;;
-    2)
-        echo -e "${GREEN}Running completely offline (localhost only)...${NC}"
-        source "$VENV_DIR/bin/activate"
-        cd "$WEBUI_DIR" || exit 1
-        echo -e "Access it at: http://127.0.0.1:7860"
-        python launch.py --skip-torch-cuda-test --no-half --listen --skip-install
-        cleanup
-        ;;
-    3)
-        echo -e "${RED}Uninstalling...${NC}"
-        bash "$USER_HOME/remove.sh"
-        ;;
-    q|Q)
-        echo -e "${YELLOW}Quitting.${NC}"
-        exit 0
-        ;;
-    *)
-        echo -e "${RED}Invalid option. Exiting.${NC}"
-        exit 1
-        ;;
-esac
-EOF
-
-chmod +x "$USER_HOME/run_sd.sh"
-
-# Create the remove.sh script
-progress_bar "Creating remove.sh script..."
-cat <<'EOF' > "$USER_HOME/remove.sh"
-#!/bin/bash
-
-USER_HOME=$(eval echo ~$USER)
-
-if [ -f "$USER_HOME/run_sd.sh" ]; then
-    echo "Removing $USER_HOME/run_sd.sh..."
-    rm "$USER_HOME/run_sd.sh"
-fi
-
-if [ -d "$USER_HOME/stable-diffusion-webui" ]; then
-    echo "Removing $USER_HOME/stable-diffusion-webui..."
-    rm -rf "$USER_HOME/stable-diffusion-webui"
-fi
-
-if [ -d "$USER_HOME/stable-diffusion-env" ]; then
-    echo "Removing $USER_HOME/stable-diffusion-env..."
-    rm -rf "$USER_HOME/stable-diffusion-env"
-fi
-
-if [ -f "$USER_HOME/remove.sh" ]; then
-    echo "Removing $USER_HOME/remove.sh..."
-    rm "$USER_HOME/remove.sh"
-fi
-
-echo "Cleanup complete."
-EOF
-
-chmod +x "$USER_HOME/remove.sh"
-
-echo "Patch to repair broken repo pre-loded from automatic1111 offical GitHub repo."
-cd "$USER_HOME/stable-diffusion-webui" || exit 1
-cp -a modules/launch_utils.py "modules/launch_utils.py.bak.$(date +%F_%H%M%S)"
-grep -n "stable_diffusion_repo" modules/launch_utils.py >/dev/null 2>&1
-grep -n "stable_diffusion_commit_hash" modules/launch_utils.py >/dev/null 2>&1
-sed -i 's#https://github.com/Stability-AI/stablediffusion.git#https://github.com/comp6062/Stability-AI-stablediffusion.git#g' modules/launch_utils.py
-rm -rf repositories/stable-diffusion-stability-ai
-echo "End Patch"
-
-# Installer succeeded; don't clean up.
-CLEANUP_ON_FAIL=0
-
-# Final message
-echo -e "${GREEN}Setup complete.${NC} Use ~/run_sd.sh to start Stable Diffusion or ~/remove.sh to uninstall."
+```bash
+uname -m
