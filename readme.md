@@ -210,14 +210,6 @@ If you prefer to **skip downloading models during installation** (for example, f
 
 ### How to Disable
 
-1. Open the setup script:
-   ```bash
-   nano setup_sd.sh
-   ```
-
-2. Locate the model download section.
-
-3. Comment out the two download lines as shown below.
 
 ### Disabled (No Model Downloads)
 ```bash
