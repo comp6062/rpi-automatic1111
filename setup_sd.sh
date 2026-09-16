@@ -182,12 +182,22 @@ select_models() {
   local cursor_2=" "
   local cursor_3=" "
   local cursor_4=" "
+  local total_size_hundredths=0
+  local total_download_size=""
 
   while true; do
     [ "$cursor" -eq 0 ] && cursor_1=">" || cursor_1=" "
     [ "$cursor" -eq 1 ] && cursor_2=">" || cursor_2=" "
     [ "$cursor" -eq 2 ] && cursor_3=">" || cursor_3=" "
     [ "$cursor" -eq 3 ] && cursor_4=">" || cursor_4=" "
+
+    # Sum the displayed model sizes in hundredths of a GB.
+    total_size_hundredths=$((
+      DOWNLOAD_CYBERREALISTIC * 213 + DOWNLOAD_REALISTIC_VISION * 427 +
+      DOWNLOAD_REALISTIC_VISION_V6 * 213 + DOWNLOAD_REAL_DREAM * 213
+    ))
+    printf -v total_download_size '%d.%02d GB' \
+      "$((total_size_hundredths / 100))" "$((total_size_hundredths % 100))"
 
     clear 2>/dev/null || true
     cat <<MENU
@@ -200,6 +210,8 @@ Use Up/Down to move. Press Space or Enter to toggle the highlighted model.
   $cursor_2 $([ "$DOWNLOAD_REALISTIC_VISION" = "1" ] && echo "[X]" || echo "[ ]") Realistic_Vision_V5.1-inpainting.safetensors (4.27 GB)
   $cursor_3 $([ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ] && echo "[X]" || echo "[ ]") Realistic_Vision_V6.0_NV_B1_fp16.safetensors (2.13 GB)
   $cursor_4 $([ "$DOWNLOAD_REAL_DREAM" = "1" ] && echo "[X]" || echo "[ ]") sd1.5-real-dream-16.safetensors (2.13 GB)
+
+  Total selected download: $total_download_size (approx.)
 
   C) Continue
   B) Back to install options
@@ -472,13 +484,51 @@ progress "Patching launch_utils..."
 sed -i 's#https://github.com/Stability-AI/stablediffusion.git#https://github.com/comp6062/Stability-AI-stablediffusion.git#g' modules/launch_utils.py
 sed -i 's/run_pip(f"install {clip_package}", "clip")/run_pip(f"install --no-build-isolation {clip_package}", "clip")/g' modules/launch_utils.py
 
+render_model_progress() {
+  local overall_pct="$1" speed_text="$2"
+  shift 2
+  local term_size term_cols bar_width part_pct filled empty fill_text empty_text progress_line
+  local -a part_bars=()
+
+  # Query the controlling terminal on every refresh, including when stdin is piped.
+  term_size="$(stty size 2>/dev/null </dev/tty || true)"
+  term_cols="${term_size##* }"
+  [[ "$term_cols" =~ ^[0-9]+$ ]] || term_cols=80
+  [ "$term_cols" -gt 1 ] || term_cols=2
+
+  for bar_width in 5 4 3 2 1; do
+    part_bars=()
+    for part_pct in "$@"; do
+      filled=$((part_pct * bar_width / 100))
+      [ "$part_pct" -gt 0 ] && [ "$filled" -eq 0 ] && filled=1
+      empty=$((bar_width - filled))
+      printf -v fill_text '%*s' "$filled" ''
+      printf -v empty_text '%*s' "$empty" ''
+      part_bars+=("${fill_text// /#}${empty_text// /-}")
+    done
+    printf -v progress_line '  Model download %3d%% [P1:%s|P2:%s|P3:%s|P4:%s|P5:%s]  Speed: %s' \
+      "$overall_pct" "${part_bars[0]}" "${part_bars[1]}" "${part_bars[2]}" "${part_bars[3]}" "${part_bars[4]}" "$speed_text"
+    [ "${#progress_line}" -lt "$term_cols" ] && break
+  done
+
+  if [ "${#progress_line}" -ge "$term_cols" ]; then
+    printf -v progress_line '%3d%% [%s|%s|%s|%s|%s] %s' \
+      "$overall_pct" "${part_bars[0]}" "${part_bars[1]}" "${part_bars[2]}" "${part_bars[3]}" "${part_bars[4]}" "$speed_text"
+  fi
+  if [ "${#progress_line}" -ge "$term_cols" ]; then
+    printf -v progress_line '%d%% %s' "$overall_pct" "$speed_text"
+  fi
+  # Leave the last column unused to avoid terminal autowrap. Cursor positioning
+  # also avoids carriage-return translation by terminal output settings.
+  printf '\033[1G\033[2K%s' "${progress_line:0:term_cols-1}"
+}
+
 download_if_missing() {
   local url="$1" destination="$2" temporary="${2}.part" expected_hash actual_hash
   local headers file_size display_size chunk_size start end expected_size actual_size chunk download_failed
-  local total_downloaded overall_pct part_pct filled empty fill_text empty_text progress_line running proc_state
-  local last_total last_ns now_ns elapsed_ms delta_bytes speed_bps speed_text term_cols
-  local bar_width=5
-  local -a chunks=() pids=() part_pcts=(0 0 0 0 0) part_bars=("-----" "-----" "-----" "-----" "-----")
+  local total_downloaded overall_pct part_pct running proc_state
+  local last_total last_ns now_ns elapsed_ms delta_bytes speed_bps speed_text
+  local -a chunks=() pids=() part_pcts=(0 0 0 0 0)
 
   if [ ! -f "$destination" ]; then
     mkdir -p "$(dirname "$destination")"
@@ -495,25 +545,7 @@ download_if_missing() {
     display_size="$(awk -v bytes="$file_size" 'BEGIN { printf "%.2f GB", bytes / 1000000000 }')"
     echo "  $(basename "$destination") ($display_size)"
 
-    # Leave room for the speed field so the five-part bar stays on one row.
-    term_cols="$(tput cols 2>/dev/null || printf '80')"
-    [[ "$term_cols" =~ ^[0-9]+$ ]] || term_cols=80
-    if [ "$term_cols" -lt 74 ]; then
-      bar_width=1
-    elif [ "$term_cols" -lt 80 ]; then
-      bar_width=2
-    elif [ "$term_cols" -lt 90 ]; then
-      bar_width=3
-    else
-      bar_width=5
-    fi
-
-    printf -v empty_text '%*s' "$bar_width" ''
-    empty_text="${empty_text// /-}"
-    part_bars=("$empty_text" "$empty_text" "$empty_text" "$empty_text" "$empty_text")
-    printf -v progress_line '  Model download %3d%% [P1:%s|P2:%s|P3:%s|P4:%s|P5:%s]  Speed: %s' \
-      0 "${part_bars[0]}" "${part_bars[1]}" "${part_bars[2]}" "${part_bars[3]}" "${part_bars[4]}" "0.00 MB/s"
-    printf '\033[2K\r%s' "$progress_line"
+    render_model_progress 0 "0.00 MB/s" "${part_pcts[@]}"
     last_total=0
     last_ns="$(date +%s%N)"
     speed_text="0.00 MB/s"
@@ -546,15 +578,6 @@ download_if_missing() {
         part_pct=$(( actual_size * 100 / expected_size ))
         part_pcts[chunk]="$part_pct"
 
-        filled=$(( part_pct * bar_width / 100 ))
-        [ "$part_pct" -gt 0 ] && [ "$filled" -eq 0 ] && filled=1
-        empty=$(( bar_width - filled ))
-        printf -v fill_text '%*s' "$filled" ''
-        printf -v empty_text '%*s' "$empty" ''
-        fill_text="${fill_text// /#}"
-        empty_text="${empty_text// /-}"
-        part_bars[chunk]="${fill_text}${empty_text}"
-
         if [ -r "/proc/${pids[chunk]}/stat" ]; then
           proc_state="$(awk '{print $3}' "/proc/${pids[chunk]}/stat" 2>/dev/null || true)"
           [ -n "$proc_state" ] && [ "$proc_state" != "Z" ] && running=1
@@ -575,9 +598,7 @@ download_if_missing() {
         last_ns="$now_ns"
       fi
 
-      printf -v progress_line '  Model download %3d%% [P1:%s|P2:%s|P3:%s|P4:%s|P5:%s]  Speed: %s' \
-        "$overall_pct" "${part_bars[0]}" "${part_bars[1]}" "${part_bars[2]}" "${part_bars[3]}" "${part_bars[4]}" "$speed_text"
-      printf '\033[2K\r%s' "$progress_line"
+      render_model_progress "$overall_pct" "$speed_text" "${part_pcts[@]}"
 
       [ "$running" -eq 0 ] && break
       sleep 0.5
