@@ -146,12 +146,12 @@ The GUI launches LAN and Offline modes without an Enter-to-close wait. The termi
 
 Choose one or more of these four checkpoints, or disable model downloads entirely:
 
-| File | Menu size | Use |
+| File | Menu size | Description |
 | --- | --- | --- |
-| `CyberRealistic_V7.0_FP16.safetensors` | 2.13 GB | General image generation. |
-| `Realistic_Vision_V5.1-inpainting.safetensors` | 4.27 GB | Inpainting. |
-| `Realistic_Vision_V6.0_NV_B1_fp16.safetensors` | 2.13 GB | General image generation. |
-| `sd1.5-real-dream-16.safetensors` | 2.13 GB | General image generation. |
+| `CyberRealistic_V7.0_FP16.safetensors` | 2.13 GB | Photorealistic image generation, with a focus on lifelike people, portraits, and scenes. [Model details](https://huggingface.co/cyberdelia/CyberRealistic). |
+| `Realistic_Vision_V5.1-inpainting.safetensors` | 4.27 GB | Inpainting checkpoint for repairing or replacing masked areas of an existing image, such as a face, object, or background section. [Model details](https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE). |
+| `Realistic_Vision_V6.0_NV_B1_fp16.safetensors` | 2.13 GB | The V6.0 “New Vision” beta checkpoint for realistic, photo-style images, including portraits and full-body subjects; this is the general-generation version. [Model details](https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE). |
+| `sd1.5-real-dream-16.safetensors` | 2.13 GB | Real Dream's SD 1.5 checkpoint for realistic and photorealistic image generation—another option for exploring a different look with the same prompt. [Model details](https://huggingface.co/sinatra-rd/sd-1.5-real-dream). |
 
 The selector totals the rounded sizes shown above: **10.66 GB** with all four enabled. These are fixed labels, not live size lookups. The download title uses the size returned by the host.
 
