@@ -4,15 +4,17 @@
 ![CPU](https://img.shields.io/badge/acceleration-CPU--only-orange)
 ![ARM64](https://img.shields.io/badge/ARM64-aarch64-success)
 
-A streamlined, fully automated installer for **AUTOMATIC1111 Stable Diffusion WebUI** on **Raspberry Pi 5-class ARM-based systems** (Raspberry Pi 5, Raspberry Pi 500, and Compute Module 5).
+An interactive installer for **AUTOMATIC1111 Stable Diffusion WebUI** on Raspberry Pi 5-class hardware. It sets up a Python virtual environment, optional model downloads, a terminal launcher, and an optional Tkinter GUI with desktop and menu icons.
 
-This project is designed for CPU-only inference and provides an interactive installation experience with an optional graphical launcher, desktop integration, menu integration, optional model downloads, and a clean uninstall process.
+Inference runs on the CPU. The Pi's GPU is not used for generation; patience remains part of the dependency stack.
 
-> **Hardware Requirement**
+> **Hardware and OS**
 >
-> This installer is designed and supported for **Raspberry Pi 5-class hardware**: Raspberry Pi 5, Raspberry Pi 500, and Compute Module 5. Earlier Raspberry Pi models are not supported.
+> The installer accepts **Raspberry Pi 5, Raspberry Pi 500, and Compute Module 5**, with an **aarch64** OS and at least **4 GiB reported by `/proc/meminfo`**. A nominal 4 GB board may report less and fail this check.
 >
-> A **64-bit ARM (aarch64)** operating system and at least **4 GiB of RAM** are required. The installation requires at least **15 GiB of free disk space** without the included model downloads, or **25 GiB** when the included models are downloaded.
+> Raspberry Pi OS 64-bit on Pi 5 is the environment previously reported working in this project's documentation. The code also accepts OS IDs `raspbian`, `debian`, and `ubuntu`, but that check does not establish compatibility with every release. Pi 500, CM5, and other accepted OS combinations still need recorded testing.
+>
+> Installation and the first LAN-mode launch need internet access. There is **no free-space check** in this version. Allow room for the environment, WebUI, models, temporary download pieces, and any existing installation retained during replacement. No measured minimum disk requirement is established here.
 
 ---
 
@@ -34,9 +36,24 @@ This project is designed for CPU-only inference and provides an interactive inst
 curl -sSL https://raw.githubusercontent.com/comp6062/rpi-automatic1111/main/setup_sd.sh | bash
 ```
 
+This runs the script from the repository's current `main` branch. It does not run a separately downloaded or locally edited copy.
+
+To inspect and run a downloaded bundle, open its directory and use:
+
+```bash
+less setup_sd.sh
+bash setup_sd.sh
+```
+
+Run from your normal desktop account with sudo available. The script uses sudo for system packages and selected setup commands. A desktop session is needed for the GUI, which uses Tkinter, Pillow, Zenity, and LXTerminal.
+
+**Before installing:** the script removes lines containing `piwheels` from user and system pip configuration. With the GUI enabled, it also sets `quick_exec=1` in libfm/PCManFM configuration. These settings affect more than this application and are not restored on uninstall.
+
+Back up an existing installation before running setup again; see [Uninstall](#7-uninstall) for the reinstall and data-removal details.
+
 ## 2. Interactive installer
 
-Before installation begins, an interactive configuration menu allows you to customize the installation.
+The initial menu looks like this with the defaults enabled and `/home/admin` as the user's home:
 
 ```text
 Stable Diffusion Raspberry Pi Installer
@@ -45,171 +62,160 @@ Use the menu below to choose install options.
 
   1) Download included models:  ON
   2) Install GUI launcher:      ON
-  3) Create desktop shortcut:   ON
+     (reboot required)
+  3) Create desktop icon:       ON
   4) Create menu launcher:      ON
   5) Install files location:    /home/admin
 
-  6) Start install
-  q) Quit
+  S) Start install
+  Q) Quit
 ```
 
-By default, the installer uses your home directory:
+Press a number without Enter to change an option. Disabling the GUI also disables both icons; enabling it again enables both. Option 5 accepts a custom installation directory, with Tab completion for existing paths. Setup creates the selected directory if needed.
 
-```bash
-~/
-```
+Press **S** to continue. With downloads enabled, use **Up/Down** to select a model and **Space/Enter** to toggle it. **C** continues, **B** returns to the options, and **Q** quits. At least one model must be selected while downloads are enabled. Letter controls accept either case.
 
-This creates:
+The summary lists the installation path, selected models, and launcher options. Confirm with **Y** or Enter; other keys cancel. With the GUI enabled, setup finishes with a single-key reboot prompt: **Y** reboots; other keys skip it.
 
-```bash
-~/stable-diffusion-webui
-~/stable-diffusion-env
+The default installation root is your home directory. The main installed files are:
+
+```text
+~/stable-diffusion-webui/
+~/stable-diffusion-env/
 ~/run_sd.sh
 ```
 
-If a custom installation directory is selected, these files are created in that location instead.
+A custom root moves these together. Desktop and menu entries still live in your user's home directory and point to the selected root.
 
 ## 3. Running Stable Diffusion
 
-Launch the application with:
-
 ```bash
 ~/run_sd.sh
 ```
 
-If installed elsewhere:
+For a custom root:
 
 ```bash
 /path/to/install/run_sd.sh
 ```
 
-The launcher provides:
+The terminal menu reads a choice followed by Enter:
 
-1. LAN Mode — Starts the WebUI with network access. On first launch it downloads and installs any required runtime components.
-2. Offline Mode — Starts the WebUI without dependency checks.
-3. Stop Running — Stops the currently running WebUI instance.
-4. Uninstall — Removes the installed application, virtual environment, launcher, and shortcuts.
+| Choice | Action |
+| --- | --- |
+| `1` | LAN mode: starts WebUI and permits dependency setup. |
+| `2` | Offline mode: starts with `--skip-install`. |
+| `3` | Stop running: checks the recorded PID, working directory, and command before stopping WebUI. |
+| `4` | Uninstall: asks for confirmation, then removes the installation. |
+| `q` | Quit. |
+
+Both launch modes use `--listen` and port **7860**. Open `http://127.0.0.1:7860` on the Pi, or `http://<Pi-IP>:7860` from another device. The launcher does not configure authentication. Use it on a trusted network; **Offline mode still listens on the network**.
 
 ## 4. First launch
 
-The first launch should always be performed using **LAN Mode** while connected to the internet. This allows AUTOMATIC1111 to complete its initial setup and install any required runtime components.
+Start in **LAN mode** with internet access so WebUI can finish its runtime setup. After that succeeds, use **Offline mode** to skip installation checks. It is not a network-isolation mode, and extensions or missing assets may still need internet access.
 
-After the initial setup has completed successfully, **Offline Mode** can be used without performing additional dependency checks.
+Generation time and memory use depend on the model and image settings. This bundle includes no measured benchmarks or guarantee that every model will fit in memory. The launcher uses `--no-half`; FP16 checkpoint filenames describe the downloaded files, not a promise of FP16 inference.
 
 ## 5. GUI launcher
 
-When enabled, the installer creates:
+With the GUI enabled, setup writes these files under the installation root:
 
-```bash
+```text
 .sd_gui_app.py
 .sd_gui_runner.sh
 .sd_gui_banner.png
+```
+
+The optional desktop icon is `~/Desktop/StableDiffusionGUI.desktop`. The menu entry is `~/.local/share/applications/sd-gui.desktop`, under **Applications → Graphics → Stable Diffusion** where the desktop supports that category.
+
+Icons are installed at:
+
+```text
 ~/.local/share/icons/sd_icon.png
 ~/.local/share/icons/hicolor/256x256/apps/sd_icon.png
 ```
 
-Desktop shortcut (optional):
+The GUI offers LAN Mode, Offline Mode, Stop Running, Uninstall, and Open Web-UI. LAN launch waits for WebUI to respond and then opens the browser. Offline launch does not automatically open it; use **Open Web-UI**.
 
-```bash
-~/Desktop/StableDiffusionGUI.desktop
-```
+When Chromium is available, the GUI opens a separate app window with an installation-specific browser profile. **Stop WebUI** also attempts to close that browser process group. The default-browser fallback is not tracked and may stay open.
 
-When enabled, the **Stable Diffusion** launcher appears directly on the desktop.
-
-Menu launcher (optional):
-
-```bash
-~/.local/share/applications/sd-gui.desktop
-```
-
-When enabled, open it from **Applications → Graphics → Stable Diffusion**.
-
-Both launchers use the installed icon:
-
-```text
-sd_icon
-```
-
-The GUI provides quick access to:
-
-- LAN Mode
-- Offline Mode
-- Stop Running
-- Uninstall
-- Open WebUI
+When launched from the GUI, LAN and Offline terminals close automatically when WebUI exits, including after Stop; there is no Enter-to-close wait. **Exit** closes the GUI window without stopping WebUI.
 
 ## 6. Model downloads
 
-Downloading models during installation is optional.
+Choose any combination of the four included checkpoints:
 
-When enabled, the installer downloads:
+| File | Menu size | Use |
+| --- | --- | --- |
+| `CyberRealistic_V7.0_FP16.safetensors` | 2.13 GB | General image generation. |
+| `Realistic_Vision_V5.1-inpainting.safetensors` | 4.27 GB | Inpainting. |
+| `Realistic_Vision_V6.0_NV_B1_fp16.safetensors` | 2.13 GB | General image generation. |
+| `sd1.5-real-dream-16.safetensors` | 2.13 GB | General image generation. |
 
-- `CyberRealistic_V7.0_FP16.safetensors`
-- `Realistic_Vision_V5.1-inpainting.safetensors`
+Downloads use five parallel byte ranges, display progress on one row, and update the speed calculation at roughly one-second intervals. The download title uses the size returned by the host; menu sizes are fixed labels.
 
-If model downloads are disabled, models can be added later to:
+Each piece is checked for size. The combined file is checked against the SHA-256 value supplied by Hugging Face's `x-linked-etag` header before activation. This detects mismatched downloads, but the hash comes from the same host and is not pinned independently in the installer. Downloads have curl retries plus up to 20 whole-model attempts.
 
-```bash
-stable-diffusion-webui/models/Stable-diffusion/
+To supply your own checkpoint, place it under:
+
+```text
+<installation root>/stable-diffusion-webui/models/Stable-diffusion/
 ```
+
+Check the model publisher's license and usage terms. Model selection does not establish compatibility with every checkpoint.
 
 ## 7. Uninstall
 
-Run:
+Run your installation's `run_sd.sh`, select **4**, and confirm with `y` or `yes` followed by Enter. The GUI also offers an uninstall confirmation.
 
-```bash
-~/run_sd.sh
-```
+**Back up anything you want to keep first.** Uninstall removes the entire WebUI directory, including models, generated images, extensions, and configuration stored there. It also removes the virtual environment, `run_sd.sh`, GUI helpers, desktop/menu entries, and `.sd-runtime` directory.
 
-Select:
+Installed icon files and apt packages remain. The pip and desktop configuration changes also remain.
 
-```text
-4) Uninstall
-```
-
-If installed in a custom location, run that installation's `run_sd.sh` and choose the uninstall option.
-
-The uninstaller asks for confirmation before removing:
-
-- `stable-diffusion-webui`
-- `stable-diffusion-env`
-- `run_sd.sh`
-- GUI helper files
-- Desktop shortcut
-- Menu launcher
-- `<installation directory>/.sd-runtime/gui.pid`
+There is no dedicated updater. **Re-running setup is a replacement install:** it stages a fresh WebUI checkout, backs up the old WebUI and environment, creates the new environment at its final path, and deletes the backups on success. It does not migrate existing models, outputs, extensions, or settings. Error rollback exists, but does not cover every failure or restore all launcher and system changes. Keep a separate backup before reinstalling.
 
 ## 8. Included files
 
-- `setup_sd.sh` — Self-contained interactive installer
-- `sd_gui_banner.png` — GUI banner artwork for local installs
-- `sd_icon.png` — Desktop and menu launcher icon
-- `README.md` — Project documentation
-- `validate_bundle.sh` — Pre-publication bundle validation script
+| File | Purpose |
+| --- | --- |
+| `setup_sd.sh` | Installer, embedded launchers, and fallback artwork. |
+| `sd_gui_banner.png` | Banner used when found alongside a local installer. |
+| `sd_icon.png` | Icon used when found alongside a local installer. |
+| `README.md` | Installation and usage notes. |
+| `validate_bundle.sh` | Static bundle checks. |
 
-Remote installations require only `setup_sd.sh`.
+Remote setup needs only `setup_sd.sh`. Its embedded artwork has different dimensions from the companion PNG files. Relative-path invocation may also fall back to the embedded assets after setup changes directory, so local and remote installations can use different artwork. Neither version was changed in the maintenance pass.
 
 ## 9. Notes
 
-- Designed for **Raspberry Pi 5-class hardware**: Raspberry Pi 5, Raspberry Pi 500, and Compute Module 5.
-- Compatible with **Raspbian, Debian, and Ubuntu (64-bit ARM)**.
-- CPU-only PyTorch is installed.
-- The installer validates Raspberry Pi 5-class hardware, ARM64 architecture, a Raspbian/Debian/Ubuntu operating system, available RAM, and free disk space before installation. It has been tested and confirmed working on Raspberry Pi OS 64-bit (ARM64/aarch64) on a Raspberry Pi 5.
-- Reinstallation is staged and restores the previous working WebUI and virtual environment if installation fails.
-- The replacement virtual environment is created directly at its final path after the previous installation is backed up, avoiding broken absolute paths caused by moving a completed virtual environment.
-- Included model downloads are verified against the SHA-256 object hash supplied by Hugging Face before they are activated.
-- System packages are installed without performing a full operating-system upgrade.
-- Running WebUI processes are stopped using the installation-specific PID and working directory rather than broad process matching.
-- Runtime PID files are stored in the installation-scoped `.sd-runtime` directory instead of shared filenames in `/tmp`.
-- The installer uses the known working AUTOMATIC1111 commit validated for this project.
-- Run LAN Mode once before using Offline Mode.
+WebUI is pinned to commit `82a973c04367123ae98bd9abdf80d9eda9b910e2`. Setup redirects the Stable Diffusion repository URL to `comp6062/Stability-AI-stablediffusion`, adjusts the CLIP installation command, and pins several Python dependencies. Other dependencies remain unpinned, so future installs may resolve different versions.
 
-## Bundle validation
+Setup installs apt dependencies without a full OS upgrade. Runtime PID files live under `<installation root>/.sd-runtime`; desktop entry names and installed icon names are shared across installations for the same user.
 
-Run the included validation script from the project directory before publishing or installing:
+### Troubleshooting
+
+- **Platform rejected:** check `uname -m`, `/proc/device-tree/model`, `/etc/os-release`, and `MemTotal` in `/proc/meminfo`. The installer checks the reported values, not the board's advertised RAM.
+- **Model download fails:** keep the terminal error, check connectivity and disk space, and note whether the failure mentions headers, piece size, or SHA-256. Setup does not provide a persistent download-resume interface.
+- **WebUI fails to launch:** capture the terminal traceback. Use LAN mode for initial dependency setup. “Installation is incomplete” means the launcher could not find its Python executable or `launch.py`.
+- **GUI or icon does not launch:** follow setup's reboot instruction, then run `<installation root>/.sd_gui_runner.sh` from a desktop terminal to see errors. The installer assumes a literal `~/Desktop` directory.
+- **Launch error disappears when the terminal closes:** run `<installation root>/run_sd.sh` from an existing terminal to keep the error output visible.
+
+### Bundle validation
 
 ```bash
+bash validate_bundle.sh
+```
+
+The supplied archive has no Unix executable-mode metadata and extracts here with both shell scripts non-executable. The validator therefore stops at its executable check. To make a local validation copy executable:
+
+```bash
+chmod +x setup_sd.sh validate_bundle.sh
 ./validate_bundle.sh
 ```
 
-It checks the installer executable permission, Bash syntax, embedded GUI Python syntax, final-path virtual-environment logic, model hash verification, and installation-scoped runtime PID configuration.
+The validator checks Bash and embedded GUI Python syntax, then looks for selected implementation markers. It does not perform an installation, generate an image, or prove rollback and uninstall behavior. Real Pi testing is still required before submission.
+
+### Licensing
+
+This bundle contains no project license file. A license for the installer and permission to redistribute its artwork need to be established before presenting it as a ready-to-submit open-source release. WebUI, dependencies, and model files have their own terms; this README does not grant rights to them.

@@ -25,6 +25,7 @@ get_home_for_user() {
   [ -d "$h" ] && echo "$h" || echo "${HOME:-/home/$u}"
 }
 
+# Read from the controlling terminal when the installer arrives through a pipe.
 read_tty() {
   local prompt="$1"
   local default="$2"
@@ -141,6 +142,8 @@ USER_HOME="$(get_home_for_user "$TARGET_USER")"
 DOWNLOAD_MODELS=1
 DOWNLOAD_CYBERREALISTIC=1
 DOWNLOAD_REALISTIC_VISION=1
+DOWNLOAD_REALISTIC_VISION_V6=1
+DOWNLOAD_REAL_DREAM=1
 INCLUDE_GUI=1
 CREATE_DESKTOP=1
 CREATE_MENU=1
@@ -177,10 +180,14 @@ select_models() {
   local key_rest=""
   local cursor_1=" "
   local cursor_2=" "
+  local cursor_3=" "
+  local cursor_4=" "
 
   while true; do
     [ "$cursor" -eq 0 ] && cursor_1=">" || cursor_1=" "
     [ "$cursor" -eq 1 ] && cursor_2=">" || cursor_2=" "
+    [ "$cursor" -eq 2 ] && cursor_3=">" || cursor_3=" "
+    [ "$cursor" -eq 3 ] && cursor_4=">" || cursor_4=" "
 
     clear 2>/dev/null || true
     cat <<MENU
@@ -191,6 +198,8 @@ Use Up/Down to move. Press Space or Enter to toggle the highlighted model.
 
   $cursor_1 $([ "$DOWNLOAD_CYBERREALISTIC" = "1" ] && echo "[X]" || echo "[ ]") CyberRealistic_V7.0_FP16.safetensors (2.13 GB)
   $cursor_2 $([ "$DOWNLOAD_REALISTIC_VISION" = "1" ] && echo "[X]" || echo "[ ]") Realistic_Vision_V5.1-inpainting.safetensors (4.27 GB)
+  $cursor_3 $([ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ] && echo "[X]" || echo "[ ]") Realistic_Vision_V6.0_NV_B1_fp16.safetensors (2.13 GB)
+  $cursor_4 $([ "$DOWNLOAD_REAL_DREAM" = "1" ] && echo "[X]" || echo "[ ]") sd1.5-real-dream-16.safetensors (2.13 GB)
 
   C) Continue
   B) Back to install options
@@ -217,20 +226,25 @@ MENU
 
     case "$key" in
       $'\e[A')
-        cursor=0
+        cursor=$((cursor > 0 ? cursor - 1 : 0))
         ;;
       $'\e[B')
-        cursor=1
+        cursor=$((cursor < 3 ? cursor + 1 : 3))
         ;;
       " "|"")
         if [ "$cursor" -eq 0 ]; then
           [ "$DOWNLOAD_CYBERREALISTIC" = "1" ] && DOWNLOAD_CYBERREALISTIC=0 || DOWNLOAD_CYBERREALISTIC=1
-        else
+        elif [ "$cursor" -eq 1 ]; then
           [ "$DOWNLOAD_REALISTIC_VISION" = "1" ] && DOWNLOAD_REALISTIC_VISION=0 || DOWNLOAD_REALISTIC_VISION=1
+        elif [ "$cursor" -eq 2 ]; then
+          [ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ] && DOWNLOAD_REALISTIC_VISION_V6=0 || DOWNLOAD_REALISTIC_VISION_V6=1
+        else
+          [ "$DOWNLOAD_REAL_DREAM" = "1" ] && DOWNLOAD_REAL_DREAM=0 || DOWNLOAD_REAL_DREAM=1
         fi
         ;;
       c|C)
-        if [ "$DOWNLOAD_CYBERREALISTIC" = "1" ] || [ "$DOWNLOAD_REALISTIC_VISION" = "1" ]; then
+        if [ "$DOWNLOAD_CYBERREALISTIC" = "1" ] || [ "$DOWNLOAD_REALISTIC_VISION" = "1" ] ||
+           [ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ] || [ "$DOWNLOAD_REAL_DREAM" = "1" ]; then
           return 0
         fi
         echo "Select at least one model while model downloads are ON."
@@ -259,6 +273,12 @@ selected_models_label() {
   fi
   if [ "$DOWNLOAD_REALISTIC_VISION" = "1" ]; then
     printf '\n               - Realistic_Vision_V5.1-inpainting.safetensors (4.27 GB)'
+  fi
+  if [ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ]; then
+    printf '\n               - Realistic_Vision_V6.0_NV_B1_fp16.safetensors (2.13 GB)'
+  fi
+  if [ "$DOWNLOAD_REAL_DREAM" = "1" ]; then
+    printf '\n               - sd1.5-real-dream-16.safetensors (2.13 GB)'
   fi
   printf '\n'
 }
@@ -475,8 +495,7 @@ download_if_missing() {
     display_size="$(awk -v bytes="$file_size" 'BEGIN { printf "%.2f GB", bytes / 1000000000 }')"
     echo "  $(basename "$destination") ($display_size)"
 
-    # Keep the live status on one physical terminal row. The added speed
-    # field can otherwise push the five-piece bar past the terminal width.
+    # Leave room for the speed field so the five-part bar stays on one row.
     term_cols="$(tput cols 2>/dev/null || printf '80')"
     [[ "$term_cols" =~ ^[0-9]+$ ]] || term_cols=80
     if [ "$term_cols" -lt 74 ]; then
@@ -633,6 +652,18 @@ if [ "$DOWNLOAD_MODELS" = "1" ]; then
     "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1-inpainting.safetensors" \
     "$STAGE_WEBUI_DIR/models/Stable-diffusion/Realistic_Vision_V5.1-inpainting.safetensors"
   fi
+
+  if [ "$DOWNLOAD_REALISTIC_VISION_V6" = "1" ]; then
+    download_model_with_retries \
+    "https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE/resolve/main/Realistic_Vision_V6.0_NV_B1_fp16.safetensors?download=true" \
+    "$STAGE_WEBUI_DIR/models/Stable-diffusion/Realistic_Vision_V6.0_NV_B1_fp16.safetensors"
+  fi
+
+  if [ "$DOWNLOAD_REAL_DREAM" = "1" ]; then
+    download_model_with_retries \
+    "https://huggingface.co/sinatra-rd/sd-1.5-real-dream/resolve/main/sd1.5-real-dream-16.safetensors?download=true" \
+    "$STAGE_WEBUI_DIR/models/Stable-diffusion/sd1.5-real-dream-16.safetensors"
+  fi
 fi
 
 progress "Activating completed installation..."
@@ -642,6 +673,7 @@ rm -rf "$BACKUP_WEBUI_DIR" "$BACKUP_VENV_DIR"
 SWAP_STARTED=1
 mv "$STAGE_WEBUI_DIR" "$WEBUI_DIR"
 
+# Virtual-environment entry points embed absolute paths; create it in place.
 progress "Creating virtual environment at its final path..."
 sudo -u "$TARGET_USER" python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
@@ -754,8 +786,7 @@ chmod +x "$RUN_SD_PATH"
 chown "$TARGET_USER:$TARGET_USER" "$RUN_SD_PATH"
 
 if [ "$INCLUDE_GUI" = "1" ]; then
-# GUI LAUNCHER
-# ============================================================
+# Generate the GUI here so the remote installer needs no companion files.
 APP_NAME="Stable Diffusion"
 LAUNCHER="$USER_HOME/.local/share/applications/sd-gui.desktop"
 DESKTOP_SHORTCUT="$USER_HOME/Desktop/StableDiffusionGUI.desktop"
@@ -8159,6 +8190,8 @@ EOF
 cat <<'EOF' > "$INSTALL_ROOT/.sd_gui_app.py"
 #!/usr/bin/env python3
 import os
+import signal
+import shutil
 import socket
 import subprocess
 import threading
@@ -8178,6 +8211,8 @@ HOME = os.path.expanduser("~")
 SCRIPT = "__RUN_SD_PATH__"
 WEBUI_DIR = "__WEBUI_DIR__"
 PID_FILE = "__GUI_PID_FILE__"
+WEBUI_BROWSER_PID_FILE = os.path.join(os.path.dirname(PID_FILE), "webui-browser.pid")
+WEBUI_BROWSER_PROFILE = os.path.join(os.path.dirname(PID_FILE), "webui-browser-profile")
 BANNER_IMAGE = "__BANNER_PATH__"
 
 BG = "#050814"
@@ -8233,7 +8268,7 @@ def run_mode(mode):
     elif str(mode) == "3":
         cmd = f"printf '3\n' | {shell_quote(SCRIPT)}"
     else:
-        cmd = f"printf '%s\n' {mode} | {shell_quote(SCRIPT)}; echo; echo Press ENTER to close...; read"
+        cmd = f"printf '%s\n' {mode} | {shell_quote(SCRIPT)}"
     proc = subprocess.Popen(["setsid", "lxterminal", "--command", f"bash -c {shell_quote(cmd)}"])
     os.makedirs(os.path.dirname(PID_FILE), mode=0o700, exist_ok=True)
     with open(PID_FILE, "w", encoding="utf-8") as f:
@@ -8244,8 +8279,33 @@ def run_mode(mode):
         threading.Thread(target=wait_for_webui_and_open, daemon=True).start()
 
 
+def close_webui_browser():
+    try:
+        with open(WEBUI_BROWSER_PID_FILE, "r", encoding="utf-8") as f:
+            pid = int(f.read().strip())
+        if pid > 1:
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except Exception:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        os.remove(WEBUI_BROWSER_PID_FILE)
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+
+
 def stop_run():
     subprocess.run([SCRIPT], input="3\n", text=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    close_webui_browser()
     notify("Stable Diffusion stopped")
 
 
@@ -8277,8 +8337,36 @@ def get_lan_ip():
     return "127.0.0.1"
 
 
+def launch_webui_browser(url):
+    browser = shutil.which("chromium") or shutil.which("chromium-browser")
+    if not browser:
+        webbrowser.open(url)
+        return
+
+    close_webui_browser()
+    os.makedirs(os.path.dirname(WEBUI_BROWSER_PID_FILE), mode=0o700, exist_ok=True)
+    os.makedirs(WEBUI_BROWSER_PROFILE, mode=0o700, exist_ok=True)
+    try:
+        proc = subprocess.Popen(
+            [
+                browser,
+                f"--user-data-dir={WEBUI_BROWSER_PROFILE}",
+                f"--app={url}",
+                "--no-first-run",
+                "--no-default-browser-check",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        with open(WEBUI_BROWSER_PID_FILE, "w", encoding="utf-8") as f:
+            f.write(str(proc.pid))
+    except Exception:
+        webbrowser.open(url)
+
+
 def open_webui():
-    webbrowser.open(f"http://{get_lan_ip()}:7860")
+    launch_webui_browser(f"http://{get_lan_ip()}:7860")
 
 
 def wait_for_webui_and_open():
@@ -8286,7 +8374,7 @@ def wait_for_webui_and_open():
     for _ in range(180):
         try:
             with urllib.request.urlopen(url, timeout=2):
-                webbrowser.open(url)
+                launch_webui_browser(url)
                 notify(f"Stable Diffusion WebUI opened: {url}")
                 return
         except Exception:
@@ -8388,6 +8476,7 @@ root.deiconify()
 root.mainloop()
 EOF
 
+# Use Python string literals for paths substituted into the quoted GUI template.
 python3 - "$INSTALL_ROOT/.sd_gui_app.py" "$RUN_SD_PATH" "$WEBUI_DIR" "$INSTALL_ROOT/.sd_gui_banner.png" "$INSTALL_ROOT/.sd-runtime/gui.pid" <<'PY_PATCH'
 from pathlib import Path
 import sys
@@ -10097,6 +10186,7 @@ install_sd_launcher_icon
 mkdir -p "$USER_HOME/.local/share/applications"
 mkdir -p "$USER_HOME/Desktop"
 
+# Desktop Exec fields have their own quoting rules.
 desktop_exec_quote() {
   local value="$1"
   value="${value//\\/\\\\}"
