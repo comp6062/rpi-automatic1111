@@ -44,7 +44,7 @@ grep -Fq 'expected_hash' "$INSTALLER" || fail "expected model hash comparison is
 grep -Fq 'SHA-256 verification failed' "$INSTALLER" || fail "model hash mismatch handling is missing"
 pass "model SHA-256 verification"
 
-grep -Fq 'RUNTIME_DIR="$INSTALL_ROOT/.sd-runtime"' "$INSTALLER" || fail "installation-scoped runtime directory is missing"
+grep -Fq 'RUNTIME_DIR="\$INSTALL_ROOT/.sd-runtime"' "$INSTALLER" || fail "installation-scoped runtime directory is missing"
 grep -Fq 'WEBUI_PID_FILE="\$RUNTIME_DIR/webui.pid"' "$INSTALLER" || fail "installation-scoped WebUI PID file is missing"
 grep -Fq 'GUI_PID_FILE="\$RUNTIME_DIR/gui.pid"' "$INSTALLER" || fail "installation-scoped GUI PID file is missing"
 if grep -Eq '/tmp/(sd_webui|sd_gui)\.pid' "$INSTALLER"; then

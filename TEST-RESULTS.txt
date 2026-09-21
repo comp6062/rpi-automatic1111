@@ -1,0 +1,78 @@
+Leftover-icon correction validation, 2026-09-21
+
+PASS: 23 unit/regression tests, including six added icon-backup tests.
+PASS: mocked lifecycle reproduces leftover icons, failed fresh-install restoration,
+      successful install, update rollback, uninstall, reinstall and deferred reboot.
+PASS: setup_sd.sh, original assets, shell adapters and reboot helper are byte-identical
+      to the previous delivered ZIP. Only the state helper's icon conflict handling changed.
+PASS: updated Python helper compiles.
+LIMIT: no actual Raspberry Pi installation, downloads or inference run here.
+
+Previous release validation follows for reference:
+
+Local validation, 2026-09-17. Mocked integration is not a Raspberry Pi installation test.
+
+$ bash validate_bundle.sh
+PASS: setup_sd.sh is executable
+PASS: setup_sd.sh Bash syntax
+PASS: embedded GUI Python syntax
+PASS: final-path virtual-environment creation
+PASS: model SHA-256 verification
+PASS: installation-scoped runtime PID files
+PASS: pinned dependency verification
+
+Bundle validation passed.
+
+Exit: 0
+
+$ python3 -m unittest discover -s tests -v
+test_uploaded_baseline_fingerprints (test_locked.LockedInterfaces.test_uploaded_baseline_fingerprints) ... ok
+test_desktop_exec_real_glib_parser (test_paths.Paths.test_desktop_exec_real_glib_parser) ... ok
+test_generated_shell_assignments (test_paths.Paths.test_generated_shell_assignments) ... ok
+test_no_reboot_on_failure_old_status_or_wrong_token (test_reboot.Reboot.test_no_reboot_on_failure_old_status_or_wrong_token) ... ok
+test_reboot_only_after_matching_commit_and_new_status (test_reboot.Reboot.test_reboot_only_after_matching_commit_and_new_status) ... ok
+test_timeout_does_not_reboot (test_reboot.Reboot.test_timeout_does_not_reboot) ... ok
+test_failure_between_backup_moves (test_state.Transactions.test_failure_between_backup_moves) ... ok
+test_failure_restores_trees_and_launchers (test_state.Transactions.test_failure_restores_trees_and_launchers) ... ok
+test_fresh_failure_removes_only_attempt (test_state.Transactions.test_fresh_failure_removes_only_attempt) ... ok
+test_intent_written_move_not_done (test_state.Transactions.test_intent_written_move_not_done) ... ok
+test_modified_program_blocks_update_without_loss (test_state.Transactions.test_modified_program_blocks_update_without_loss) ... ok
+test_receipt_paths_cannot_escape (test_state.Transactions.test_receipt_paths_cannot_escape) ... ok
+test_redirected_parent_blocks_uninstall (test_state.Transactions.test_redirected_parent_blocks_uninstall) ... ok
+test_uninstall_preserves_all_nonowned_and_modified (test_state.Transactions.test_uninstall_preserves_all_nonowned_and_modified) ... ok
+test_unmanaged_collision (test_state.Transactions.test_unmanaged_collision) ... ok
+test_update_preserves_data_and_external_link (test_state.Transactions.test_update_preserves_data_and_external_link) ... ok
+test_wrong_root_and_manager_rejected (test_state.Transactions.test_wrong_root_and_manager_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.162s
+
+OK
+Program files removed. User data remains in /tmp/tmp2adn9aj2/space "quote" $HOME `echo` % directory; 1 modified owned files retained.
+Program files removed. User data remains in /tmp/tmpbbktt5yl/space "quote" $HOME `echo` % directory; 0 modified owned files retained.
+
+Exit: 0
+
+$ python3 tests/verify_model_ui.py tests/model-baseline.txt setup_sd.sh
+PASS: all 16 model selections have identical rows, approximate totals, and summary labels
+PASS: progress output identical and shorter than terminal width at 2, 20, 40, 60, 80, 120 columns
+PASS: no Enter-to-close prompt in either GUI template
+Limits: isolated functions and static GUI check; no network, install, inference, or desktop session.
+
+Exit: 0
+
+$ python3 tests/integration.py
+PASS: accepted reboot survives installer exit and waits for manager success (sudo mocked)
+PASS: real menus: cancel, fresh install, pip failure rollback, update, uninstall, reinstall with retained data
+PASS: Pi-Apps package dispatch, receipt/status, unchanged pip/file-manager settings, generated GUI and launchers
+LIMIT: fake platform, git, apt, pip; no ARM64/inference/desktop-session validation
+
+Exit: 0
+
+$ /workspace/scratch/becd6d69416a/piapps-build/tools/bin/shellcheck piapps/entry.sh piapps/hooks.sh piapps/packages.sh piapps/app/install-64 piapps/app/uninstall
+
+Exit: 0
+
+PASS: all Pi-Apps Python helpers compile.
+
+Final lifecycle follow-up: empty uninstall after cancellation also passed; updated entry.sh passed ShellCheck.

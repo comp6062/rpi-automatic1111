@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+app_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+manager=$(cd -- "$app_dir/../.." && pwd)
+(cd -- "$app_dir/payload" && sha256sum --quiet -c SHA256SUMS)
+exec bash "$app_dir/payload/piapps/entry.sh" install "$manager" "${1:-}"
