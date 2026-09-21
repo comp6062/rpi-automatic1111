@@ -1,0 +1,64 @@
+--- previous/piapps/state.py
++++ updated/piapps/state.py
+@@ -8,6 +8,7 @@
+ from pathlib import Path
+ import shutil
+ import sys
++import tempfile
+ import uuid
+ 
+ 
+@@ -132,12 +133,28 @@
+         web = root / 'stable-diffusion-webui'
+         env = root / 'stable-diffusion-env'
+         extras = self.extra_paths(root)
++        icon_names = {
++            self.home / '.local/share/icons/hicolor/256x256/apps/sd_icon.png': 'sd_icon-hicolor.png',
++            self.home / '.local/share/icons/sd_icon.png': 'sd_icon-fallback.png',
++        }
++        legacy_icons = []
+         for item in [web, env, *extras]:
+             safe_parent(item)
+             if item.is_symlink():
+                 raise ValueError(f'Refusing redirected installation file: {item}')
+             if not old and item.exists():
+-                raise ValueError(f'Existing unmanaged file; choose an unused location: {item}')
++                if item in icon_names and item.is_file() and item.stat().st_uid == os.getuid():
++                    legacy_icons.append(item)
++                else:
++                    raise ValueError(f'Existing unmanaged installation or integration file: {item}. '
++                                     'Keep the working installation; shared launchers must be resolved separately.')
++        if legacy_icons and root != self.home:
++            # A different selected root does not make the default installation obsolete.
++            for name in ('stable-diffusion-webui', 'stable-diffusion-env', 'run_sd.sh',
++                         '.sd_gui_runner.sh', '.sd_gui_app.py', '.sd_gui_banner.png'):
++                item = self.home / name
++                if item.exists() or item.is_symlink():
++                    raise ValueError(f'Existing default installation may use the shared icons: {item}')
+         if old:
+             for item in extras:
+                 expected = old['extras'].get(str(item))
+@@ -171,9 +188,23 @@
+                 snapshots[str(item)] = str(destination)
+         record = dict(schema=1, uid=os.getuid(), home=str(self.home), root=str(root),
+                       manager=manager, token=token, web={}, env={}, extras={})
++        if old and old.get('legacy_icon_backup'):
++            record['legacy_icon_backup'] = old['legacy_icon_backup']
++        if legacy_icons:
++            # Keep these originals outside transaction cleanup and uninstall ownership.
++            safe_parent(self.home / 'sd-icon-backup')
++            saved_icons = Path(tempfile.mkdtemp(prefix='sd-icon-backup.', dir=self.home))
++            for item in legacy_icons:
++                shutil.copy2(item, saved_icons / icon_names[item])
++            record['legacy_icon_backup'] = str(saved_icons)
+         journal = dict(record=record, old=old, backup=str(backup), stage=stage,
+                        snapshots=snapshots, moves=[], committed=False)
+         write_json(self.journal, journal)
++        # Recovery can restore the exact original paths once the journal is durable.
++        for item in legacy_icons:
++            item.unlink()
++        if legacy_icons:
++            print(f'Leftover icons backed up to: {record["legacy_icon_backup"]}', flush=True)
+ 
+     def preserve(self, group, destination):
+         journal = self.read(self.journal)

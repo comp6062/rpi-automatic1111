@@ -1,0 +1,5 @@
+#!/bin/bash
+set -euo pipefail
+app_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+manager=$(cd -- "$app_dir/../.." && pwd)
+exec bash "$app_dir/payload/piapps/entry.sh" uninstall "$manager" "${1:-}"

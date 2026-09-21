@@ -29,6 +29,7 @@ Inference runs on the CPU. The Pi's GPU is not used for generation; patience rem
 7. [Uninstall](#7-uninstall)
 8. [Included files](#8-included-files)
 9. [Notes](#9-notes)
+10. [Pi-Apps installation](#10-pi-apps-installation)
 
 ## 1. Remote install
 
@@ -47,7 +48,7 @@ bash setup_sd.sh
 
 Run from your normal account with sudo available. Setup installs system packages; the GUI needs a desktop session and uses Tkinter, Pillow, Zenity, and LXTerminal.
 
-**Before installing:** the script removes lines containing `piwheels` from user and system pip configuration. With the GUI enabled, it also sets `quick_exec=1` in libfm/PCManFM configuration. These settings affect more than this application and are not restored on uninstall.
+**Standalone installation:** the script removes lines containing `piwheels` from user and system pip configuration. With the GUI enabled, it also sets `quick_exec=1` in libfm/PCManFM configuration. These settings affect more than this application and are not restored on uninstall.
 
 Back up an existing installation before running setup again; see [Uninstall](#7-uninstall) for the reinstall and data-removal details.
 
@@ -188,11 +189,11 @@ Check the model publisher's license and usage terms. Model selection does not es
 
 Run your installation's `run_sd.sh`, select **4**, and confirm with `y` or `yes` followed by Enter. The GUI also offers an uninstall confirmation.
 
-**Back up anything you want to keep first.** Uninstall removes the entire WebUI directory, including models, generated images, extensions, and configuration stored there. It also removes the virtual environment, `run_sd.sh`, GUI helpers, desktop/menu entries, and `.sd-runtime` directory.
+**Standalone installs: back up anything you want to keep first.** Uninstall removes the entire WebUI directory, including models, generated images, extensions, and configuration stored there. It also removes the virtual environment, `run_sd.sh`, GUI helpers, desktop/menu entries, and `.sd-runtime` directory.
 
 Installed icon files and apt packages remain. The pip and desktop configuration changes also remain.
 
-There is no dedicated updater. **Re-running setup replaces the installation.** Setup stages a fresh WebUI checkout, backs up the old WebUI and environment, and deletes those backups after success. Existing models, outputs, extensions, and settings are not migrated. Rollback covers some failures, but not every exit path or system change. Keep your own backup before reinstalling.
+For standalone installs, there is no dedicated updater. **Re-running setup replaces the installation.** Setup stages a fresh WebUI checkout, backs up the old WebUI and environment, and deletes those backups after success. Existing models, outputs, extensions, and settings are not migrated. Rollback covers some failures, but not every exit path or system change. Keep your own backup before reinstalling.
 
 ## 8. Included files
 
@@ -203,6 +204,8 @@ There is no dedicated updater. **Re-running setup replaces the installation.** S
 | `sd_icon.png` | Icon used when found alongside a local installer. |
 | `README.md` | Installation and usage notes. |
 | `validate_bundle.sh` | Static bundle checks. |
+| `piapps/` | Optional Pi-Apps adapter, ownership/rollback helpers, metadata, and package builder. |
+| `tests/` | Isolated lifecycle, path, and CodeLock regression checks. |
 
 Remote setup needs only `setup_sd.sh`; fallback artwork is embedded. The companion PNGs have different dimensions. Local asset lookup happens after setup changes directory, so invoking the script with a relative path can also select the embedded artwork.
 
@@ -226,7 +229,7 @@ Setup installs apt dependencies without a full OS upgrade. Runtime PID files liv
 bash validate_bundle.sh
 ```
 
-The supplied ZIP has no Unix executable-mode metadata. If extraction leaves the scripts non-executable, the validator stops at its permission check. To enable direct execution in your local copy:
+The release ZIP records executable permissions. If your extraction tool drops them, restore them before validation:
 
 ```bash
 chmod +x setup_sd.sh validate_bundle.sh
@@ -238,3 +241,36 @@ The validator checks Bash and GUI Python syntax and looks for a few implementati
 ### Licensing
 
 No project license file is included yet. Installer licensing and artwork redistribution rights need to be settled before an open-source release. WebUI, dependencies, and models have separate terms.
+
+
+## 10. Pi-Apps installation
+
+The Pi-Apps package is a separate entry point into the same installer. It keeps the four model choices, menus, GUI, and LAN/Offline/Stop controls. It is a local testing candidate, not an accepted Pi-Apps listing. Real-Pi testing and the licensing decisions above are still outstanding.
+
+Build the import ZIP from this project directory:
+
+```bash
+python3 piapps/build.py Stable-Diffusion-PiApps.zip
+```
+
+Import `Stable-Diffusion-PiApps.zip` through Pi-Apps Settings, then install **Stable Diffusion**. The ZIP contains one `Stable Diffusion/` app folder with `install-64`, `uninstall`, metadata, icons, and a generated copy of this release's installer/helpers. To rebuild it after source changes, run the command again; do not maintain a separate installer in the package.
+
+Use your normal desktop account. The existing menus require a controlling terminal. For a terminal-based installation after import:
+
+```bash
+"$HOME/pi-apps/manage" install "Stable Diffusion"
+```
+
+Pi-Apps registers the selected apt dependencies. This installation mode leaves pip configuration and global file-manager execution settings alone. If your desktop asks whether to execute a shortcut, use the application-menu launcher or mark that shortcut as trusted using your desktop's controls.
+
+An existing standalone installation is never adopted automatically. Existing program directories, GUI helpers, or desktop/menu launchers still cause a conflict. If only the two old `sd_icon.png` files remain at the checked paths, Pi-Apps backs them up automatically to a unique `~/sd-icon-backup.*` folder and continues. The originals remain in that backup after installation and uninstall; a failed installation restores their original paths. Symlinked icons and icons owned by another user are not automatically replaced. The check covers the selected root, default home-root installation paths, and shared launchers; it does not search other custom installation locations. Keep your working standalone setup while testing this package in a separate desktop account or disposable Pi OS installation. Do not run the standalone installer over a Pi-Apps-owned installation.
+
+For updates, stop WebUI and close the GUI first. The selected installation root is recorded in `~/.local/state/rpi-automatic1111/receipt.json`. An update retains models, outputs, extensions, settings, and other added files. Modified program files that conflict with new versions stop the update instead of being overwritten. Keep enough free space for the old tree and the replacement at the same time, including copied models; there is still no free-space preflight.
+
+Pi-Apps removal deletes only recorded, unchanged application files and releases its package dependencies. It retains user data at the existing paths, including custom output locations and symlink targets. A small removal record remains so reinstall can reuse retained data. Modified application files and runtime-created files may also remain; this favors preservation over a tidy empty directory. The GUI/CLI **Uninstall** action delegates to Pi-Apps for these installations. Its existing warning still says “all installed files”; Pi-Apps mode retains data as described here.
+
+Failed updates restore the previous program trees and launchers. Pi-Apps itself may release dependency registrations after a failure, even when file rollback succeeds; retry through Pi-Apps before relying on the restored installation. An interrupted transaction is recovered on the next Pi-Apps operation. Do not delete its backups or state files to make an error disappear.
+
+The reboot question is unchanged. If you answer **Y**, reboot waits for Pi-Apps to finish recording this installation. If the manager fails, takes longer than five minutes, or sudo authorization expires, it will not reboot; check `~/.local/state/rpi-automatic1111/reboot.log` and reboot manually.
+
+See [Pi-Apps Readiness Review](Pi-Apps-Readiness-Review.md) for validation results and the remaining submission work.
