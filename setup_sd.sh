@@ -139,13 +139,6 @@ ask_yes_no() {
 TARGET_USER="$(get_target_user)"
 USER_HOME="$(get_home_for_user "$TARGET_USER")"
 
-PIAPPS_MODE=0
-if [ "${1:-}" = "--pi-apps" ]; then
-  PIAPPS_MODE=1
-  # shellcheck source=/dev/null
-  source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/piapps/hooks.sh"
-fi
-
 DOWNLOAD_MODELS=1
 DOWNLOAD_CYBERREALISTIC=1
 DOWNLOAD_REALISTIC_VISION=1
@@ -155,10 +148,6 @@ INCLUDE_GUI=1
 CREATE_DESKTOP=1
 CREATE_MENU=1
 INSTALL_ROOT="$USER_HOME"
-if [ "$PIAPPS_MODE" = 1 ]; then
-  PIAPPS_EXISTING_ROOT="$(piapps_state root)"
-  [ -z "$PIAPPS_EXISTING_ROOT" ] || INSTALL_ROOT="$PIAPPS_EXISTING_ROOT"
-fi
 
 show_installer_menu() {
   clear 2>/dev/null || true
@@ -398,10 +387,6 @@ case "${CONFIRM_INSTALL,,}" in
   *) echo "Install cancelled."; exit 0 ;;
 esac
 
-if [ "$PIAPPS_MODE" = 1 ]; then
-  INSTALL_ROOT="$(realpath -m -- "$INSTALL_ROOT")"
-fi
-
 WEBUI_DIR="$INSTALL_ROOT/stable-diffusion-webui"
 VENV_DIR="$INSTALL_ROOT/stable-diffusion-env"
 RUN_SD_PATH="$INSTALL_ROOT/run_sd.sh"
@@ -443,9 +428,7 @@ rollback_install() {
   fi
   exit "$status"
 }
-if [ "$PIAPPS_MODE" != 1 ]; then
-  trap rollback_install ERR INT TERM
-fi
+trap rollback_install ERR INT TERM
 
 cat <<SUMMARY
 
@@ -462,12 +445,8 @@ SUMMARY
 mkdir -p "$INSTALL_ROOT"
 chown "$TARGET_USER:$TARGET_USER" "$INSTALL_ROOT" 2>/dev/null || true
 validate_platform
-if [ "$PIAPPS_MODE" = 1 ]; then
-  piapps_begin
-fi
 
 progress "Detected supported platform: $(tr -d '\0' </proc/device-tree/model) / $(uname -m)"
-if [ "$PIAPPS_MODE" != 1 ]; then
 progress "Sanitizing pip configuration..."
 
 sed -i '/piwheels/d' "$USER_HOME/.config/pip/pip.conf" 2>/dev/null || true
@@ -476,8 +455,6 @@ sudo sed -i '/piwheels/d' /etc/pip.conf 2>/dev/null || true
 
 progress "Refreshing package lists..."
 sudo apt update
-
-fi
 
 progress "Installing dependencies..."
 APT_PACKAGES=(
@@ -491,11 +468,7 @@ if [ "$INCLUDE_GUI" = "1" ] || [ "$CREATE_DESKTOP" = "1" ] || [ "$CREATE_MENU" =
   APT_PACKAGES+=(python3-tk python3-pil python3-pil.imagetk fonts-dejavu-core zenity lxterminal)
 fi
 
-if [ "$PIAPPS_MODE" = 1 ]; then
-  piapps_packages
-else
-  sudo apt install -y "${APT_PACKAGES[@]}"
-fi
+sudo apt install -y "${APT_PACKAGES[@]}"
 
 progress "Preparing staged WebUI..."
 rm -rf "$STAGE_WEBUI_DIR"
@@ -510,10 +483,6 @@ sudo -u "$TARGET_USER" git checkout 82a973c04367123ae98bd9abdf80d9eda9b910e2
 progress "Patching launch_utils..."
 sed -i 's#https://github.com/Stability-AI/stablediffusion.git#https://github.com/comp6062/Stability-AI-stablediffusion.git#g' modules/launch_utils.py
 sed -i 's/run_pip(f"install {clip_package}", "clip")/run_pip(f"install --no-build-isolation {clip_package}", "clip")/g' modules/launch_utils.py
-
-if [ "$PIAPPS_MODE" = 1 ]; then
-  piapps_state capture-web "$STAGE_WEBUI_DIR"
-fi
 
 render_model_progress() {
   local overall_pct="$1" speed_text="$2"
@@ -719,15 +688,11 @@ if [ "$DOWNLOAD_MODELS" = "1" ]; then
 fi
 
 progress "Activating completed installation..."
-if [ "$PIAPPS_MODE" = 1 ]; then
-  piapps_state activate
-else
 rm -rf "$BACKUP_WEBUI_DIR" "$BACKUP_VENV_DIR"
 [ -d "$WEBUI_DIR" ] && mv "$WEBUI_DIR" "$BACKUP_WEBUI_DIR"
 [ -d "$VENV_DIR" ] && mv "$VENV_DIR" "$BACKUP_VENV_DIR"
 SWAP_STARTED=1
 mv "$STAGE_WEBUI_DIR" "$WEBUI_DIR"
-fi
 
 # Virtual-environment entry points embed absolute paths; create it in place.
 progress "Creating virtual environment at its final path..."
@@ -760,13 +725,11 @@ cat > "$RUN_SD_PATH" <<RUNEOF
 #!/bin/bash
 set -euo pipefail
 
-WEBUI_DIR=$(printf '%q' "$WEBUI_DIR")
-VENV_DIR=$(printf '%q' "$VENV_DIR")
-INSTALL_ROOT=$(printf '%q' "$INSTALL_ROOT")
-RUN_SD_PATH=$(printf '%q' "$RUN_SD_PATH")
-USER_HOME=$(printf '%q' "$USER_HOME")
-PIAPPS_MANAGER=$(printf '%q' "$([ "$PIAPPS_MODE" != 1 ] || printf '%s' "$SD_PIAPPS_MANAGER")")
-RUNTIME_DIR="\$INSTALL_ROOT/.sd-runtime"
+WEBUI_DIR="$WEBUI_DIR"
+VENV_DIR="$VENV_DIR"
+INSTALL_ROOT="$INSTALL_ROOT"
+RUN_SD_PATH="$RUN_SD_PATH"
+RUNTIME_DIR="$INSTALL_ROOT/.sd-runtime"
 WEBUI_PID_FILE="\$RUNTIME_DIR/webui.pid"
 GUI_PID_FILE="\$RUNTIME_DIR/gui.pid"
 mkdir -p "\$RUNTIME_DIR"
@@ -822,13 +785,10 @@ case "\$c" in
   4)
     read -rp "Permanently uninstall Stable Diffusion and all installed files? [y/N]: " confirm
     case "\${confirm,,}" in y|yes) ;; *) echo "Uninstall cancelled."; exit 0 ;; esac
-    if [ -n "\$PIAPPS_MANAGER" ]; then
-      exec "\$PIAPPS_MANAGER/manage" uninstall "Stable Diffusion"
-    fi
     "\$RUN_SD_PATH" <<< "3" >/dev/null 2>&1 || true
     rm -rf -- "\$WEBUI_DIR" "\$VENV_DIR"
     rm -f -- "\$INSTALL_ROOT/.sd_gui_runner.sh" "\$INSTALL_ROOT/.sd_gui_app.py" "\$INSTALL_ROOT/.sd_gui_banner.png"
-    rm -f -- "\$USER_HOME/.local/share/applications/sd-gui.desktop" "\$USER_HOME/Desktop/StableDiffusionGUI.desktop"
+    rm -f -- "$USER_HOME/.local/share/applications/sd-gui.desktop" "$USER_HOME/Desktop/StableDiffusionGUI.desktop"
     rm -f "\$WEBUI_PID_FILE" "\$GUI_PID_FILE"
     rm -rf -- "\$RUNTIME_DIR"
     rm -f -- "\$RUN_SD_PATH"
@@ -8245,7 +8205,7 @@ chown "$TARGET_USER:$TARGET_USER" "$INSTALL_ROOT/.sd_gui_banner.png"
 cat > "$INSTALL_ROOT/.sd_gui_runner.sh" <<EOF
 #!/bin/bash
 set -euo pipefail
-python3 $(printf '%q' "$INSTALL_ROOT/.sd_gui_app.py")
+python3 "$INSTALL_ROOT/.sd_gui_app.py"
 EOF
 
 cat <<'EOF' > "$INSTALL_ROOT/.sd_gui_app.py"
@@ -10247,20 +10207,16 @@ install_sd_launcher_icon
 mkdir -p "$USER_HOME/.local/share/applications"
 mkdir -p "$USER_HOME/Desktop"
 
-# Desktop Exec fields are parsed once as strings, then as an argument vector.
+# Desktop Exec fields have their own quoting rules.
 desktop_exec_quote() {
-  python3 - "$1" <<'PY_EXEC'
-import sys
-value = sys.argv[1].replace('%', '%%')
-for char in ('\\', '"', '`', '$'):
-    value = value.replace(char, '\\' + char)
-value = '"' + value + '"'
-value = value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-print(value, end='')
-PY_EXEC
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//\`/\\\`}"
+  value="${value//\$/\\$}"
+  printf '"%s"' "$value"
 }
-
-GUI_EXEC="/bin/bash $(desktop_exec_quote "$INSTALL_ROOT/.sd_gui_runner.sh")"
+GUI_EXEC="$(desktop_exec_quote "$INSTALL_ROOT/.sd_gui_runner.sh")"
 
 cat > "$LAUNCHER" << EOF
 [Desktop Entry]
@@ -10301,9 +10257,7 @@ configure_desktop_execute_prompt() {
   set_quick_exec_value "$USER_HOME/.config/pcmanfm/LXDE/pcmanfm.conf" "config"
   set_quick_exec_value "$USER_HOME/.config/pcmanfm/default/pcmanfm.conf" "config"
 }
-if [ "$PIAPPS_MODE" != 1 ]; then
-  configure_desktop_execute_prompt
-fi
+configure_desktop_execute_prompt
 
 fi
 
@@ -10318,7 +10272,7 @@ if [ "$INCLUDE_GUI" != "1" ] && { [ "$CREATE_MENU" = "1" ] || [ "$CREATE_DESKTOP
   fi
   mkdir -p "$USER_HOME/.local/share/applications" "$USER_HOME/Desktop"
   install_sd_launcher_icon
-  CLI_EXEC="/bin/bash $(desktop_exec_quote "$RUN_SD_PATH")"
+  CLI_EXEC="$(desktop_exec_quote "$RUN_SD_PATH")"
   cat > "$LAUNCHER" <<EOF
 [Desktop Entry]
 Name=$APP_NAME
@@ -10339,13 +10293,9 @@ if [ "$INCLUDE_GUI" = "1" ]; then
   [ "$CREATE_MENU" != "1" ] && rm -f "$USER_HOME/.local/share/applications/sd-gui.desktop"
 fi
 
-if [ "$PIAPPS_MODE" = 1 ]; then
-  piapps_state commit
-else
-  rm -rf "$BACKUP_WEBUI_DIR" "$BACKUP_VENV_DIR"
-  SWAP_STARTED=0
-  trap - ERR INT TERM
-fi
+rm -rf "$BACKUP_WEBUI_DIR" "$BACKUP_VENV_DIR"
+SWAP_STARTED=0
+trap - ERR INT TERM
 ok "Setup complete."
 if [ "$CREATE_MENU" = "1" ]; then
   ok "Menu launcher: Applications > Graphics > $APP_NAME"
@@ -10369,11 +10319,7 @@ if [ "$INCLUDE_GUI" = "1" ]; then
     y)
       ok "Rebooting..."
       sync
-      if [ "$PIAPPS_MODE" = 1 ]; then
-        piapps_reboot
-      else
-        sudo reboot
-      fi
+      sudo reboot
       ;;
     *)
       ok "Reboot skipped. Reboot before using the GUI launcher."
