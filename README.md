@@ -235,6 +235,23 @@ chmod +x setup_sd.sh validate_bundle.sh
 
 The validator checks Bash and GUI Python syntax and looks for a few implementation markers. It does not test the four-model selector, downloads, installation, image generation, rollback, or uninstall. Passing it is a useful first check, not a real Pi test.
 
-### Licensing
+### Licensing and attribution
 
-No project license file is included yet. Installer licensing and artwork redistribution rights need to be settled before an open-source release. WebUI, dependencies, and models have separate terms.
+This repository is a community-maintained Raspberry Pi installer and compatibility layer. It does **not** claim ownership of, or relicense, AUTOMATIC1111 Stable Diffusion WebUI, Stable Diffusion, downloaded model checkpoints, Python packages, or system packages. Each third-party component remains subject to the license and usage terms published by its original author or distributor.
+
+| Component | License / attribution |
+| --- | --- |
+| **AUTOMATIC1111 Stable Diffusion WebUI** | Licensed upstream under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [AUTOMATIC1111 license](https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/LICENSE.txt). |
+| **Stability AI Stable Diffusion code** | The upstream Stable Diffusion codebase is released under the **MIT License**; model weights and related assets may use separate licenses. See the [upstream repository](https://github.com/Stability-AI/stablediffusion). |
+| **CyberRealistic V7.0** | Distributed under the license identified by the publisher on the [CyberRealistic model page](https://huggingface.co/cyberdelia/CyberRealistic) (`creativeml-openrail-m`). |
+| **Realistic Vision V5.1** | Distributed under the license identified by the publisher on the [Realistic Vision V5.1 model page](https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE) (`creativeml-openrail-m`). |
+| **Realistic Vision V6.0 B1** | Distributed under the license identified by the publisher on the [Realistic Vision V6.0 B1 model page](https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE) (`creativeml-openrail-m`). |
+| **Real Dream 16** | The publisher currently identifies the license as **other**. Review the current terms on the [Real Dream model page](https://huggingface.co/sinatra-rd/sd-1.5-real-dream) before redistribution or commercial use. |
+| **Python packages and system dependencies** | Remain under their respective upstream licenses. Installing them through this project does not change those terms. |
+| **Project artwork** | `sd_icon.png`, `sd_gui_banner.png`, and the matching embedded fallback artwork were created specifically for this project using **ChatGPT by OpenAI**. They are not copied from AUTOMATIC1111, Stability AI, or the model publishers. OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use/) state that, as between OpenAI and the user and to the extent permitted by applicable law, the user owns the generated output. |
+
+The optional model files are downloaded from their publishers at install time and are **not bundled in this repository**. Users are responsible for reviewing the current model license and usage restrictions before use or redistribution.
+
+The original installer, launcher code, documentation, and project-specific assets in this repository do **not currently have a standalone project license file**. If this project is intended for open-source redistribution, a separate `LICENSE` file should be added for the original project material. That license would not replace or override any of the third-party licenses listed above.
+
+This project is community-maintained and is not an official AUTOMATIC1111, Stability AI, Hugging Face, or OpenAI project, and inclusion of a name or link above does not imply endorsement.
