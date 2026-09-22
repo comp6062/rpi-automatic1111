@@ -191,7 +191,7 @@ select_models() {
     [ "$cursor" -eq 2 ] && cursor_3=">" || cursor_3=" "
     [ "$cursor" -eq 3 ] && cursor_4=">" || cursor_4=" "
 
-    # Use integer hundredths to keep the total consistent with the menu labels.
+    # Sum the displayed model sizes in hundredths of a GB.
     total_size_hundredths=$((
       DOWNLOAD_CYBERREALISTIC * 213 + DOWNLOAD_REALISTIC_VISION * 427 +
       DOWNLOAD_REALISTIC_VISION_V6 * 213 + DOWNLOAD_REAL_DREAM * 213
@@ -490,7 +490,7 @@ render_model_progress() {
   local term_size term_cols bar_width part_pct filled empty fill_text empty_text progress_line
   local -a part_bars=()
 
-  # Read the controlling terminal width so resizing also works with piped installs.
+  # Query the controlling terminal on every refresh, including when stdin is piped.
   term_size="$(stty size 2>/dev/null </dev/tty || true)"
   term_cols="${term_size##* }"
   [[ "$term_cols" =~ ^[0-9]+$ ]] || term_cols=80

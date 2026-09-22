@@ -4,7 +4,7 @@
 ![CPU](https://img.shields.io/badge/acceleration-CPU--only-orange)
 ![ARM64](https://img.shields.io/badge/ARM64-aarch64-success)
 
-Install **AUTOMATIC1111 Stable Diffusion WebUI** on Raspberry Pi 5-class hardware, with a Python virtual environment, four optional model downloads, and CLI or Tkinter launchers. Desktop and menu icons are optional too.
+An interactive installer for **AUTOMATIC1111 Stable Diffusion WebUI** on Raspberry Pi 5-class hardware. It sets up a Python virtual environment, optional model downloads, a terminal launcher, and an optional Tkinter GUI with desktop and menu icons.
 
 Inference runs on the CPU. The Pi's GPU is not used for generation; patience remains part of the dependency stack.
 
@@ -12,9 +12,9 @@ Inference runs on the CPU. The Pi's GPU is not used for generation; patience rem
 >
 > The installer accepts **Raspberry Pi 5, Raspberry Pi 500, and Compute Module 5**, with an **aarch64** OS and at least **4 GiB reported by `/proc/meminfo`**. A nominal 4 GB board may report less and fail this check.
 >
-> The project targets Raspberry Pi OS 64-bit on Pi 5. The platform check also accepts Pi 500, CM5, and OS IDs `raspbian`, `debian`, and `ubuntu`. Acceptance by that check is not a compatibility guarantee: this bundle has no test matrix covering those boards and OS releases.
+> Raspberry Pi OS 64-bit on Pi 5 is the environment previously reported working in this project's documentation. The code also accepts OS IDs `raspbian`, `debian`, and `ubuntu`, but that check does not establish compatibility with every release. Pi 500, CM5, and other accepted OS combinations still need recorded testing.
 >
-> Installation and the first LAN-mode launch need internet access. There is **no free-space check**. All four model labels total **10.66 GB**, before WebUI, dependencies, temporary files, and reinstall backups. Allow extra space; the model total is not an installation-space estimate.
+> Installation and the first LAN-mode launch need internet access. There is **no free-space check** in this version. Allow room for the environment, WebUI, models, temporary download pieces, and any existing installation retained during replacement. No measured minimum disk requirement is established here.
 
 ---
 
@@ -36,7 +36,7 @@ Inference runs on the CPU. The Pi's GPU is not used for generation; patience rem
 curl -sSL https://raw.githubusercontent.com/comp6062/rpi-automatic1111/main/setup_sd.sh | bash
 ```
 
-This runs the current `main` branch. To test changes from a downloaded ZIP, run that local copy instead.
+This runs the script from the repository's current `main` branch. It does not run a separately downloaded or locally edited copy.
 
 To inspect and run a downloaded bundle, open its directory and use:
 
@@ -45,7 +45,7 @@ less setup_sd.sh
 bash setup_sd.sh
 ```
 
-Run from your normal account with sudo available. Setup installs system packages; the GUI needs a desktop session and uses Tkinter, Pillow, Zenity, and LXTerminal.
+Run from your normal desktop account with sudo available. The script uses sudo for system packages and selected setup commands. A desktop session is needed for the GUI, which uses Tkinter, Pillow, Zenity, and LXTerminal.
 
 **Before installing:** the script removes lines containing `piwheels` from user and system pip configuration. With the GUI enabled, it also sets `quick_exec=1` in libfm/PCManFM configuration. These settings affect more than this application and are not restored on uninstall.
 
@@ -73,7 +73,7 @@ Use the menu below to choose install options.
 
 Press a number without Enter to change an option. Disabling the GUI also disables both icons; enabling it again enables both. Option 5 accepts a custom installation directory, with Tab completion for existing paths. Setup creates the selected directory if needed.
 
-Press **S** to open model selection when downloads are enabled. All four models start selected. Use **Up/Down** to move and **Space/Enter** to toggle; the approximate download total changes with your selection. **C** continues, **B** returns to the options, and **Q** quits. Select at least one model, or turn downloads off in the previous menu. Letter controls accept either case.
+Press **S** to continue. With downloads enabled, use **Up/Down** to select a model and **Space/Enter** to toggle it. **C** continues, **B** returns to the options, and **Q** quits. At least one model must be selected while downloads are enabled. Letter controls accept either case.
 
 The summary lists the installation path, selected models, and launcher options. Confirm with **Y** or Enter; other keys cancel. With the GUI enabled, setup finishes with a single-key reboot prompt: **Y** reboots; other keys skip it.
 
@@ -115,7 +115,7 @@ Both launch modes use `--listen` and port **7860**. Open `http://127.0.0.1:7860`
 
 Start in **LAN mode** with internet access so WebUI can finish its runtime setup. After that succeeds, use **Offline mode** to skip installation checks. It is not a network-isolation mode, and extensions or missing assets may still need internet access.
 
-Generation time and memory use depend on the model and image settings. There are no bundled benchmarks, and passing the RAM check does not mean every workload will fit. The launcher uses `--no-half`; FP16 checkpoint filenames describe the downloaded files, not a promise of FP16 inference.
+Generation time and memory use depend on the model and image settings. This bundle includes no measured benchmarks or guarantee that every model will fit in memory. The launcher uses `--no-half`; FP16 checkpoint filenames describe the downloaded files, not a promise of FP16 inference.
 
 ## 5. GUI launcher
 
@@ -140,41 +140,22 @@ The GUI offers LAN Mode, Offline Mode, Stop Running, Uninstall, and Open Web-UI.
 
 When Chromium is available, the GUI opens a separate app window with an installation-specific browser profile. **Stop WebUI** also attempts to close that browser process group. The default-browser fallback is not tracked and may stay open.
 
-The GUI launches LAN and Offline modes without an Enter-to-close wait. The terminal command ends when WebUI exits, including after a successful Stop. **Exit** closes the GUI window without stopping WebUI. To keep launch errors visible, start `run_sd.sh` from an existing terminal.
+When launched from the GUI, LAN and Offline terminals close automatically when WebUI exits, including after Stop; there is no Enter-to-close wait. **Exit** closes the GUI window without stopping WebUI.
 
 ## 6. Model downloads
 
-Choose one or more of these four checkpoints, or disable model downloads entirely:
+Choose any combination of the four included checkpoints:
 
-**CyberRealistic V7.0 — 2.13 GB**
+| File | Menu size | Use |
+| --- | --- | --- |
+| `CyberRealistic_V7.0_FP16.safetensors` | 2.13 GB | General image generation. |
+| `Realistic_Vision_V5.1-inpainting.safetensors` | 4.27 GB | Inpainting. |
+| `Realistic_Vision_V6.0_NV_B1_fp16.safetensors` | 2.13 GB | General image generation. |
+| `sd1.5-real-dream-16.safetensors` | 2.13 GB | General image generation. |
 
-File: `CyberRealistic_V7.0_FP16.safetensors`
+Downloads use five parallel byte ranges, display progress on one row, and update the speed calculation at roughly one-second intervals. The download title uses the size returned by the host; menu sizes are fixed labels.
 
-Photorealistic image generation, with a focus on lifelike people, portraits, and scenes. [Model details](https://huggingface.co/cyberdelia/CyberRealistic).
-
-**Realistic Vision V5.1 Inpainting — 4.27 GB**
-
-File: `Realistic_Vision_V5.1-inpainting.safetensors`
-
-Inpainting checkpoint for repairing or replacing masked areas of an existing image, such as a face, object, or background section. [Model details](https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE).
-
-**Realistic Vision V6.0 New Vision B1 — 2.13 GB**
-
-File: `Realistic_Vision_V6.0_NV_B1_fp16.safetensors`
-
-The V6.0 “New Vision” beta checkpoint for realistic, photo-style images, including portraits and full-body subjects; this is the general-generation version. [Model details](https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE).
-
-**Real Dream 16 — 2.13 GB**
-
-File: `sd1.5-real-dream-16.safetensors`
-
-Real Dream's SD 1.5 checkpoint for realistic and photorealistic image generation—another option for exploring a different look with the same prompt. [Model details](https://huggingface.co/sinatra-rd/sd-1.5-real-dream).
-
-The selector totals the rounded sizes shown above: **10.66 GB** with all four enabled. These are fixed labels, not live size lookups. The download title uses the size returned by the host.
-
-Each model downloads in five parallel pieces. The progress display checks terminal width on every refresh, shortens its bars or labels when needed, and leaves the last column clear to avoid wrapping. Progress refreshes about twice a second; speed recalculates after at least one second. Curl errors and status messages can still print separate lines.
-
-Setup checks each piece's size, joins the pieces, then checks the combined file against the SHA-256 in Hugging Face's `x-linked-etag` header. The hash comes from the download host; it is not independently pinned. Curl retries failed requests, and the installer allows up to 20 whole-model attempts.
+Each piece is checked for size. The combined file is checked against the SHA-256 value supplied by Hugging Face's `x-linked-etag` header before activation. This detects mismatched downloads, but the hash comes from the same host and is not pinned independently in the installer. Downloads have curl retries plus up to 20 whole-model attempts.
 
 To supply your own checkpoint, place it under:
 
@@ -192,7 +173,7 @@ Run your installation's `run_sd.sh`, select **4**, and confirm with `y` or `yes`
 
 Installed icon files and apt packages remain. The pip and desktop configuration changes also remain.
 
-There is no dedicated updater. **Re-running setup replaces the installation.** Setup stages a fresh WebUI checkout, backs up the old WebUI and environment, and deletes those backups after success. Existing models, outputs, extensions, and settings are not migrated. Rollback covers some failures, but not every exit path or system change. Keep your own backup before reinstalling.
+There is no dedicated updater. **Re-running setup is a replacement install:** it stages a fresh WebUI checkout, backs up the old WebUI and environment, creates the new environment at its final path, and deletes the backups on success. It does not migrate existing models, outputs, extensions, or settings. Error rollback exists, but does not cover every failure or restore all launcher and system changes. Keep a separate backup before reinstalling.
 
 ## 8. Included files
 
@@ -204,7 +185,7 @@ There is no dedicated updater. **Re-running setup replaces the installation.** S
 | `README.md` | Installation and usage notes. |
 | `validate_bundle.sh` | Static bundle checks. |
 
-Remote setup needs only `setup_sd.sh`; fallback artwork is embedded. The companion PNGs have different dimensions. Local asset lookup happens after setup changes directory, so invoking the script with a relative path can also select the embedded artwork.
+Remote setup needs only `setup_sd.sh`. Its embedded artwork has different dimensions from the companion PNG files. Relative-path invocation may also fall back to the embedded assets after setup changes directory, so local and remote installations can use different artwork. Neither version was changed in the maintenance pass.
 
 ## 9. Notes
 
@@ -226,32 +207,15 @@ Setup installs apt dependencies without a full OS upgrade. Runtime PID files liv
 bash validate_bundle.sh
 ```
 
-The supplied ZIP has no Unix executable-mode metadata. If extraction leaves the scripts non-executable, the validator stops at its permission check. To enable direct execution in your local copy:
+The supplied archive has no Unix executable-mode metadata and extracts here with both shell scripts non-executable. The validator therefore stops at its executable check. To make a local validation copy executable:
 
 ```bash
 chmod +x setup_sd.sh validate_bundle.sh
 ./validate_bundle.sh
 ```
 
-The validator checks Bash and GUI Python syntax and looks for a few implementation markers. It does not test the four-model selector, downloads, installation, image generation, rollback, or uninstall. Passing it is a useful first check, not a real Pi test.
+The validator checks Bash and embedded GUI Python syntax, then looks for selected implementation markers. It does not perform an installation, generate an image, or prove rollback and uninstall behavior. Real Pi testing is still required before submission.
 
-### Licensing and attribution
+### Licensing
 
-This repository is a community-maintained Raspberry Pi installer and compatibility layer. It does **not** claim ownership of, or relicense, AUTOMATIC1111 Stable Diffusion WebUI, Stable Diffusion, downloaded model checkpoints, Python packages, or system packages. Each third-party component remains subject to the license and usage terms published by its original author or distributor.
-
-| Component | License / attribution |
-| --- | --- |
-| **AUTOMATIC1111 Stable Diffusion WebUI** | Licensed upstream under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. See the [AUTOMATIC1111 license](https://github.com/AUTOMATIC1111/stable-diffusion-webui/blob/master/LICENSE.txt). |
-| **Stability AI Stable Diffusion code** | The upstream Stable Diffusion codebase is released under the **MIT License**; model weights and related assets may use separate licenses. See the [upstream repository](https://github.com/Stability-AI/stablediffusion). |
-| **CyberRealistic V7.0** | Distributed under the license identified by the publisher on the [CyberRealistic model page](https://huggingface.co/cyberdelia/CyberRealistic) (`creativeml-openrail-m`). |
-| **Realistic Vision V5.1** | Distributed under the license identified by the publisher on the [Realistic Vision V5.1 model page](https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE) (`creativeml-openrail-m`). |
-| **Realistic Vision V6.0 B1** | Distributed under the license identified by the publisher on the [Realistic Vision V6.0 B1 model page](https://huggingface.co/SG161222/Realistic_Vision_V6.0_B1_noVAE) (`creativeml-openrail-m`). |
-| **Real Dream 16** | The publisher currently identifies the license as **other**. Review the current terms on the [Real Dream model page](https://huggingface.co/sinatra-rd/sd-1.5-real-dream) before redistribution or commercial use. |
-| **Python packages and system dependencies** | Remain under their respective upstream licenses. Installing them through this project does not change those terms. |
-| **Project artwork** | `sd_icon.png`, `sd_gui_banner.png`, and the matching embedded fallback artwork were created specifically for this project using **ChatGPT by OpenAI**. They are not copied from AUTOMATIC1111, Stability AI, or the model publishers. OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use/) state that, as between OpenAI and the user and to the extent permitted by applicable law, the user owns the generated output. |
-
-The optional model files are downloaded from their publishers at install time and are **not bundled in this repository**. Users are responsible for reviewing the current model license and usage restrictions before use or redistribution.
-
-The original installer, launcher code, documentation, and project-specific assets in this repository do **not currently have a standalone project license file**. If this project is intended for open-source redistribution, a separate `LICENSE` file should be added for the original project material. That license would not replace or override any of the third-party licenses listed above.
-
-This project is community-maintained and is not an official AUTOMATIC1111, Stability AI, Hugging Face, or OpenAI project, and inclusion of a name or link above does not imply endorsement.
+This bundle contains no project license file. A license for the installer and permission to redistribute its artwork need to be established before presenting it as a ready-to-submit open-source release. WebUI, dependencies, and model files have their own terms; this README does not grant rights to them.
